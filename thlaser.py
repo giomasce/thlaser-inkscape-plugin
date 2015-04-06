@@ -706,9 +706,9 @@ class Gcode_tools(inkex.Effect):
                 csp = cubicsuperpath.parsePath(node.get("d"))
                 if (trans):
                     simpletransform.applyTransformToPath(trans, csp)
-                with open("/tmp/tmp", 'w+') as fdebug:
-                    import pprint
-                    fdebug.write(pprint.pformat(csp) + '\n\n')
+                #with open("/tmp/tmp", 'w+') as fdebug:
+                #    import pprint
+                #    fdebug.write(pprint.pformat(csp) + '\n\n')
                 return csp
 
             elif node.tag == SVG_GROUP_TAG:
