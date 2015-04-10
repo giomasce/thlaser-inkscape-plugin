@@ -831,7 +831,7 @@ class Gcode_tools(inkex.Effect):
     
         #The end of the layer.
         if si[1] == 'end':
-            gcode += LASER_OFF
+            gcode += LASER_OFF + '\n'
 
 
         return gcode
