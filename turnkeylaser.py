@@ -34,6 +34,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 """
 
+Changelog 2015-04-11:
+* Adapting to Gio's laser cutter (based on Marlin on Rumba, with custom laser wiring).
+* Also provide a couple of bugfixes.
+
 Changelog 2015-02-01:
 * Beginning of the project. Based on a fork from ShinyLaser(https://github.com/ajfoul/thlaser-inkscape-plugin)
 
@@ -100,8 +104,8 @@ VERSION = "1.0.1"
 
 STRAIGHT_TOLERANCE = 0.0001
 STRAIGHT_DISTANCE_TOLERANCE = 0.0001
-LASER_ON = "M3 ;turn the laser on"          # LASER ON MCODE
-LASER_OFF = "M5 ;turn the laser off\n"        # LASER OFF MCODE
+LASER_ON = "G4 P0\nM42 P8 S%d ;turn the laser on"          # LASER ON MCODE
+LASER_OFF = "G4 P0\nM42 P8 S0 ;turn the laser off"        # LASER OFF MCODE
 
 HEADER_TEXT = ""
 FOOTER_TEXT = ""
@@ -456,7 +460,7 @@ class Gcode_tools(inkex.Effect):
 
         self.OptionParser.add_option("-m", "--Mfeed",                    action="store", type="int",         dest="Mfeed", default="2000",                        help="Default Move Feed rate in unit/min")
         self.OptionParser.add_option("-p", "--feed",                    action="store", type="int",         dest="feed", default="300",                        help="Default Cut Feed rate in unit/min")
-        self.OptionParser.add_option("-l", "--laser",                    action="store", type="int",         dest="laser", default="10",                        help="Default Laser intensity (0-100 %)")
+        self.OptionParser.add_option("-l", "--laser",                    action="store", type="int",         dest="laser", default="10",                        help="Default Laser intensity (0-255)")
         self.OptionParser.add_option("-b",   "--homebefore",                 action="store", type="inkbool",    dest="homebefore", default=True, help="Home all beofre starting (G28)")
         self.OptionParser.add_option("-a",   "--homeafter",                 action="store", type="inkbool",    dest="homeafter", default=False, help="Home X Y at end of job")
         self.OptionParser.add_option("",   "--draw-order",               action="store", type="string",       dest="draw_order", default="inside_first",          help="Drawing order ('inside-first', 'outside-first' or 'no_sort')")
@@ -807,6 +811,7 @@ class Gcode_tools(inkex.Effect):
         else:
             #Set the laser firing mode to continuous.
             ppmValue = "B0 D0"
+        ppmValue = ""
 
         cwArc = "G02"
         ccwArc = "G03"
@@ -830,11 +835,15 @@ class Gcode_tools(inkex.Effect):
                 lg = 'G00'
 
             elif s[1] == 'end':
+                if lg != "G00":
+                    gcode += LASER_OFF + "\n"
                 lg = 'G00'
 
 			#G01 : Move with the laser turned on to a new point
             elif s[1] == 'line':
-                gcode += "G01 " + "S%.2f " % laserPower + self.make_args(si[0]) + " %s " % cutFeed + "%s" % ppmValue + "\n"
+                if lg == "G00":
+                    gcode += LASER_ON % (laserPower) + "\n"
+                gcode += "G01 " + self.make_args(si[0]) + " %s " % cutFeed + "%s" % ppmValue + "\n"
                 lg = 'G01'
 
             #G02 and G03 : Move in an arc with the laser turned on.
@@ -845,24 +854,30 @@ class Gcode_tools(inkex.Effect):
                     r1 = P(s[0])-P(s[2])
                     r2 = P(si[0])-P(s[2])
                     if abs(r1.mag() - r2.mag()) < 0.001:
+                        if lg == "G00":
+                            gcode += LASER_ON % (laserPower) + "\n"
                         if (s[3] > 0):
                             gcode += cwArc
                         else:
                             gcode += ccwArc
-                        gcode += " " + "S%.2f " % laserPower + self.make_args(si[0] + [None, dx, dy, None]) + " %s " % cutFeed + "%s" % ppmValue + "\n"
+                        gcode += " " + self.make_args(si[0] + [None, dx, dy, None]) + " %s " % cutFeed + "%s" % ppmValue + "\n"
 
                     else:
                         r = (r1.mag()+r2.mag())/2
+                        if lg == "G00":
+                            gcode += LASER_ON % (laserPower) + "\n"
                         if (s[3] > 0):
                             gcode += cwArc
                         else:
                             gcode += ccwArc
-                        gcode += " " + "S%.2f " % laserPower + self.make_args(si[0]) + " R%f" % (r*self.options.Xscale) + " %s " % cutFeed + "%s" % ppmValue + "\n"
+                        gcode += " " + self.make_args(si[0]) + " R%f" % (r*self.options.Xscale) + " %s " % cutFeed + "%s" % ppmValue + "\n"
 
                     lg = cwArc
                 #The arc is less than the minimum arc radius, draw it as a straight line.
                 else:
-                    gcode += "G01 " + "S%.2f " % laserPower + self.make_args(si[0]) + " %s " % cutFeed + "%s" % ppmValue + "\n"
+                    if lg == "G00":
+                        gcode += LASER_ON % (laserPower) + "\n"
+                    gcode += "G01 " + self.make_args(si[0]) + " %s " % cutFeed + "%s" % ppmValue + "\n"
                     lg = 'G01'
 
     
@@ -1158,13 +1173,13 @@ class Gcode_tools(inkex.Effect):
             laserPower = self.options.laser
             
             try:
-                if (int(layerName) > 0 and int(layerName) <= 100):
+                if (int(layerName) >= 0 and int(layerName) <= 255):
                     laserPower = int(layerName)
                 else :
                     laserPower = self.options.laser
             except ValueError,e:
                 laserPower = self.options.laser
-                inkex.errormsg("Unable to parse power level for layer name. Using default power level %d percent." % (self.options.laser))
+                inkex.errormsg("Unable to parse power level for layer name. Using default power level %d." % (self.options.laser))
                 
             
             
@@ -1238,13 +1253,13 @@ class Gcode_tools(inkex.Effect):
                     laserPower = self.options.laser
                     
                     try:
-                        if (int(layerName) > 0 and int(layerName) <= 100):
+                        if (int(layerName) >= 0 and int(layerName) <= 255):
                             laserPower = int(layerName)
                         else :
                             laserPower = self.options.laser
                     except ValueError,e:
                         laserPower = self.options.laser
-                        inkex.errormsg("Unable to parse power level for layer name. Using default power level %d percent." % (self.options.laser))
+                        inkex.errormsg("Unable to parse power level for layer name. Using default power level %d." % (self.options.laser))
                     
                     #Switch between smoothie power levels and ramps+marlin power levels
                     #ramps and marlin expect 0 to 100 while smoothie wants 0.0 to 1.0

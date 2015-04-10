@@ -62,7 +62,7 @@ For the latest revision please visit https://github.com/TurnkeyTyranny/laser-gco
             <_param name="help" type="description">(blank is your desktop)</_param>
             <param name="feed" type="int" min="0" max="5000" _gui-text="Default Cut Feedrate:">300</param>
             <param name="Mfeed" type="int" min="0" max="5000" _gui-text="Default Traversal Feedrate:">2000</param>
-            <param name="laser" type="int" min="0" max="100" _gui-text="Default Laser Intensity (0-100%):">10</param>
+            <param name="laser" type="int" min="0" max="255" _gui-text="Default Laser Intensity (0-255):">255</param>
             <param name="homebefore" type="boolean" _gui-text="Home X and Y Before:">true</param>
             <param name="homeafter" type="boolean" _gui-text="Home X and Y After:">false</param>
 
