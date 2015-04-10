@@ -226,6 +226,26 @@ def csplength(csp):
     return lengths, total
 
 
+def estimate_bb_area(curve):
+    """Roughly estimates the area of the bounding box of a curve.
+
+    It just computes min and max of the handles, does not bother with
+    computing the real bounding box of higher-order curves.
+
+    """
+    bb = [float('inf'), float('inf'), float('-inf'), float('-inf')]
+    for x in curve:
+        for y in x:
+            for z in y:
+                p = x[1]
+                assert len(p) == 2
+                bb[0] = min(bb[0], p[0])
+                bb[1] = min(bb[1], p[1])
+                bb[2] = max(bb[2], p[0])
+                bb[3] = max(bb[3], p[1])
+    return (bb[2] - bb[0]) * (bb[3] - bb[1])
+
+
 ###
 ###        Distance calculattion from point to arc
 ###
@@ -439,6 +459,7 @@ class Gcode_tools(inkex.Effect):
         self.OptionParser.add_option("-l", "--laser",                    action="store", type="int",         dest="laser", default="10",                        help="Default Laser intensity (0-100 %)")
         self.OptionParser.add_option("-b",   "--homebefore",                 action="store", type="inkbool",    dest="homebefore", default=True, help="Home all beofre starting (G28)")
         self.OptionParser.add_option("-a",   "--homeafter",                 action="store", type="inkbool",    dest="homeafter", default=False, help="Home X Y at end of job")
+        self.OptionParser.add_option("",   "--draw-order",               action="store", type="string",       dest="draw_order", default="inside_first",          help="Drawing order ('inside-first', 'outside-first' or 'no_sort')")
 
 
         self.OptionParser.add_option("",   "--biarc-tolerance",            action="store", type="float",         dest="biarc_tolerance", default="1",        help="Tolerance used when calculating biarc interpolation.")                
@@ -487,6 +508,22 @@ class Gcode_tools(inkex.Effect):
             lst = {}
             lst['type'] = "vector"
             lst['data'] = []
+
+            #with open("/tmp/tmp", 'w+') as fdebug:
+            #    import pprint
+            #    fdebug.write(pprint.pformat(path['data']) + '\n\n')
+
+            # If we sort with respect to the area of the BB, we have
+            # more or less draw first things inside. It is good to
+            # draw later outer borders, so that pieces inside do not
+            # risk to move while they detach from the bulk material
+            # (however, this also probably draw paths in a completely
+            # unoptimized order).
+            if self.options.draw_order == 'inside_first':
+                path['data'].sort(key=estimate_bb_area)
+            elif self.options.draw_order == 'outside_first':
+                path['data'].sort(key=estimate_bb_area, reverse=True)
+
             for subpath in path['data']:
                 lst['data'].append(
                     [[subpath[0][1][0]*xs, subpath[0][1][1]*ys], 'move', 0, 0]
@@ -1114,8 +1151,7 @@ class Gcode_tools(inkex.Effect):
             if (not pathList):
                 logger.write("no objects in layer")
                 continue
-                
-            
+
             #Determind the power of the laser that this layer should be cut at.
             #If the layer is not named as an integer value then default to the laser intensity set at the export settings.
             #Fetch the laser power from the export dialog box.

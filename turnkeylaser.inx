@@ -75,6 +75,12 @@ For the latest revision please visit https://github.com/TurnkeyTyranny/laser-gco
                 <item value="mm">mm</item>
                 <item value="in">in</item>
             </param>
+
+            <param name="draw-order" type="enum" _gui-text="Drawing order: ">
+              <item value="inside_first">Inside first</item>
+              <item value="outside_first">Outside first</item>
+              <item value="no_sort">Do not sort</item>
+            </param>
         </page>
     </param>    
 </inkscape-extension>
