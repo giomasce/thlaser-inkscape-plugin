@@ -19,15 +19,15 @@
 
     <param name='tab' type="notebook">
         <page name='tab' _gui-text='Help'>
-            <_param name="fullhelp" type="description">TurnkeyLaser exports Inkscape paths to Gcode compatible with Ramps+Marlin or Smoothieware laser mainboards. 
-            
+            <_param name="fullhelp" type="description">TurnkeyLaser exports Inkscape paths to Gcode compatible with Ramps+Marlin or Smoothieware laser mainboards.
+
 You're able to specify in your layer names the laser power output, feedrate and optionally the pulse per millimetre option for pulsed lasing mode as opposed to the default continuous wave operation mode.
-            
-1)Name your layer like the following example : 
+
+1)Name your layer like the following example :
 35 [feed=600,ppm=40]
 2)Draw your designs and group them based on lasing options in the layer name.
 3)Select the paths you want to export, then run this script.
-            
+
 In the example above the layer will be cut at 35% power with a feedrate of 600mm per minute and a pulse rate of 40 pulses per millimetre (at 60ms pulses).
 
 If the ppm option isn't specified in the layer options then output lines will be cut in continuous wave mode at the power and feed specified.
@@ -50,7 +50,7 @@ For the latest revision please visit https://github.com/TurnkeyTyranny/laser-gco
             <param name="Yoffset" type="float" precision="4" min="-1000" max="1000" _gui-text="Offset along Y axis">0.0</param>
             <param name="logging" type="boolean" _gui-text="Log debug output from plugin:">true</param>
         </page>
-        
+
         <page name='tab' _gui-text='Preferences'>
             <param name="origin" type="enum" _gui-text="Y Axis Origin: ">
                 <item value="topleft">Top Left</item>
@@ -70,7 +70,7 @@ For the latest revision please visit https://github.com/TurnkeyTyranny/laser-gco
             <param name="Yscale" type="float" precision="4" min="-1000" max="1000" _gui-text="Scale along Y axis:">1</param>
             <param name="double_sided_cutting" type="boolean" _gui-text="Cut both sides of material?">false</param>
             <param name="draw-curves" type="boolean" _gui-text="Draw curves in inkscape layer">true</param>
-            
+
             <param name="unit" type="enum" _gui-text="Units: ">
                 <item value="mm">mm</item>
                 <item value="in">in</item>
@@ -82,5 +82,5 @@ For the latest revision please visit https://github.com/TurnkeyTyranny/laser-gco
               <item value="no_sort">Do not sort</item>
             </param>
         </page>
-    </param>    
+    </param>
 </inkscape-extension>

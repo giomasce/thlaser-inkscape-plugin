@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 
 """
 TurnkeyLaserExporter
@@ -12,7 +12,7 @@ Based on a script by Nick Drobchenko from the CNC club
 ***
 
 Copyright (C) 2009 Nick Drobchenko, nick@cnc-club.ru
-based on gcode.py (C) 2007 hugomatic... 
+based on gcode.py (C) 2007 hugomatic...
 based on addnodes.py (C) 2005,2007 Aaron Spike, aaron@ekips.org
 based on dots.py (C) 2005 Aaron Spike, aaron@ekips.org
 based on interp.py (C) 2005 Aaron Spike, aaron@ekips.org
@@ -41,16 +41,16 @@ Changelog 2015-04-11:
 Changelog 2015-02-01:
 * Beginning of the project. Based on a fork from ShinyLaser(https://github.com/ajfoul/thlaser-inkscape-plugin)
 
-Changelog 2015-02-16: 
+Changelog 2015-02-16:
 Added an option to export as Marlin or Smoothie Power levels
 
-Changelog 2015-03-07: 
+Changelog 2015-03-07:
 Added capability to pick out power, ppm, feedrate etc from the layer names
 Added code to support Pulse Per Minute burning or continuous burning. Will default to continuous.
-M649 S100 L300 P10 - Set Laser settings to 100 percent power, pulses are each 300ms, and 10 pulses per mm.	
+M649 S100 L300 P10 - Set Laser settings to 100 percent power, pulses are each 300ms, and 10 pulses per mm.
 G0 : Move to a new location with the laser off.
 G1 : Move to a new location with the laser on.
-G2 : Move in a Clockwise Arc   
+G2 : Move in a Clockwise Arc
 G3 : Move in a Counter Clockwise Arc
 Name your layer like 10 [feed=600,ppm=40] for 10% power, 600mm per minute cut and 40 pulse per millimetre at 60ms duration
 
@@ -197,7 +197,7 @@ class P:
     def angle(self): return math.atan2(self.y, self.x)
     def __repr__(self): return '%f,%f' % (self.x, self.y)
     def pr(self): return "%.2f,%.2f" % (self.x, self.y)
-    def to_list(self): return [self.x, self.y]    
+    def to_list(self): return [self.x, self.y]
 
 
 ###
@@ -211,15 +211,15 @@ def csp_at_t(sp1,sp2,t):
 def cspbezsplit(sp1, sp2, t = 0.5):
     s1,s2 = bezmisc.beziersplitatt((sp1[1],sp1[2],sp2[0],sp2[1]),t)
     return [ [sp1[0][:], sp1[1][:], list(s1[1])], [list(s1[2]), list(s1[3]), list(s2[1])], [list(s2[2]), sp2[1][:], sp2[2][:]] ]
-    
+
 def cspbezsplitatlength(sp1, sp2, l = 0.5, tolerance = 0.01):
     bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
     t = bezmisc.beziertatlength(bez, l, tolerance)
-    return cspbezsplit(sp1, sp2, t)    
-    
+    return cspbezsplit(sp1, sp2, t)
+
 def cspseglength(sp1,sp2, tolerance = 0.001):
     bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
-    return bezmisc.bezierlength(bez, tolerance)    
+    return bezmisc.bezierlength(bez, tolerance)
 
 def csplength(csp):
     total = 0
@@ -228,7 +228,7 @@ def csplength(csp):
         for i in xrange(1,len(sp)):
             l = cspseglength(sp[i-1],sp[i])
             lengths.append(l)
-            total += l            
+            total += l
     return lengths, total
 
 
@@ -267,14 +267,14 @@ def distance_from_point_to_arc(p, arc):
     if r>0 :
         i = c + (p-c).unit()*r
         alpha = ((i-c).angle() - (P0-c).angle())
-        if a*alpha<0: 
+        if a*alpha<0:
             if alpha>0:    alpha = alpha-2*math.pi
             else: alpha = 2*math.pi+alpha
-        if between(alpha,0,a) or min(abs(alpha),abs(alpha-a))<STRAIGHT_TOLERANCE : 
+        if between(alpha,0,a) or min(abs(alpha),abs(alpha-a))<STRAIGHT_TOLERANCE :
             return (p-i).mag(), [i.x, i.y]
-        else : 
+        else :
             d1, d2 = (p-P0).mag(), (p-P2).mag()
-            if d1<d2 : 
+            if d1<d2 :
                 return (d1, [P0.x,P0.y])
             else :
                 return (d2, [P2.x,P2.y])
@@ -284,10 +284,10 @@ def get_distance_from_csp_to_arc(sp1,sp2, arc1, arc2, tolerance = 0.001 ): # arc
     d, d1, dl = (0,(0,0)), (0,(0,0)), 0
     while i<1 or (abs(d1[0]-dl[0])>tolerance and i<2):
         i += 1
-        dl = d1*1    
+        dl = d1*1
         for j in range(n+1):
             t = float(j)/n
-            p = csp_at_t(sp1,sp2,t) 
+            p = csp_at_t(sp1,sp2,t)
             d = min(distance_from_point_to_arc(p,arc1), distance_from_point_to_arc(p,arc2))
             d1 = max(d1,d)
         n=n*2
@@ -304,7 +304,7 @@ def get_distance_from_csp_to_arc(sp1,sp2, arc1, arc2, tolerance = 0.001 ): # arc
 
 
 def biarc(sp1, sp2, z1, z2, depth=0,):
-    def biarc_split(sp1,sp2, z1, z2, depth): 
+    def biarc_split(sp1,sp2, z1, z2, depth):
         if depth<options.biarc_max_split_depth:
             sp1,sp2,sp3 = cspbezsplit(sp1,sp2)
             l1, l2 = cspseglength(sp1,sp2), cspseglength(sp2,sp3)
@@ -316,7 +316,7 @@ def biarc(sp1, sp2, z1, z2, depth=0,):
     P0, P4 = P(sp1[1]), P(sp2[1])
     TS, TE, v = (P(sp1[2])-P0), -(P(sp2[0])-P4), P0 - P4
     tsa, tea, va = TS.angle(), TE.angle(), v.angle()
-    if TE.mag()<STRAIGHT_DISTANCE_TOLERANCE and TS.mag()<STRAIGHT_DISTANCE_TOLERANCE:    
+    if TE.mag()<STRAIGHT_DISTANCE_TOLERANCE and TS.mag()<STRAIGHT_DISTANCE_TOLERANCE:
         # Both tangents are zerro - line straight
         return [ [sp1[1],'line', 0, 0, sp2[1], [z1,z2]] ]
     if TE.mag() < STRAIGHT_DISTANCE_TOLERANCE:
@@ -325,11 +325,11 @@ def biarc(sp1, sp2, z1, z2, depth=0,):
     elif TS.mag() < STRAIGHT_DISTANCE_TOLERANCE:
         TS = -(TE+v).unit()
         r = 1/( TE.mag()/v.mag()*2 )
-    else:    
+    else:
         r=TS.mag()/TE.mag()
     TS, TE = TS.unit(), TE.unit()
     tang_are_parallel = ((tsa-tea)%math.pi<STRAIGHT_TOLERANCE or math.pi-(tsa-tea)%math.pi<STRAIGHT_TOLERANCE )
-    if ( tang_are_parallel  and 
+    if ( tang_are_parallel  and
                 ((v.mag()<STRAIGHT_DISTANCE_TOLERANCE or TE.mag()<STRAIGHT_DISTANCE_TOLERANCE or TS.mag()<STRAIGHT_DISTANCE_TOLERANCE) or
                     1-abs(TS*v/(TS.mag()*v.mag()))<STRAIGHT_TOLERANCE)    ):
                 # Both tangents are parallel and start and end are the same - line straight
@@ -341,10 +341,10 @@ def biarc(sp1, sp2, z1, z2, depth=0,):
     c,b,a = v*v, 2*v*(r*TS+TE), 2*r*(TS*TE-1)
     if v.mag()==0:
         return biarc_split(sp1, sp2, z1, z2, depth)
-    asmall, bsmall, csmall = abs(a)<10**-10,abs(b)<10**-10,abs(c)<10**-10 
+    asmall, bsmall, csmall = abs(a)<10**-10,abs(b)<10**-10,abs(c)<10**-10
     if         asmall and b!=0:    beta = -c/b
-    elif     csmall and a!=0:    beta = -b/a 
-    elif not asmall:     
+    elif     csmall and a!=0:    beta = -b/a
+    elif not asmall:
         discr = b*b-4*a*c
         if discr < 0:    raise ValueError, (a,b,c,discr)
         disq = discr**.5
@@ -352,10 +352,10 @@ def biarc(sp1, sp2, z1, z2, depth=0,):
         beta2 = (-b + disq) / 2 / a
         if beta1*beta2 > 0 :    raise ValueError, (a,b,c,disq,beta1,beta2)
         beta = max(beta1, beta2)
-    elif    asmall and bsmall:    
+    elif    asmall and bsmall:
         return biarc_split(sp1, sp2, z1, z2, depth)
     alpha = beta * r
-    ab = alpha + beta 
+    ab = alpha + beta
     P1 = P0 + alpha * TS
     P3 = P4 - beta * TE
     P2 = (beta / ab)  * P1 + (alpha / ab) * P3
@@ -365,22 +365,22 @@ def biarc(sp1, sp2, z1, z2, depth=0,):
         if (D-P1).mag()==0: return None, None
         R = D - ( (D-P0).mag()**2/(D-P1).mag() )*(P1-D).unit()
         p0a, p1a, p2a = (P0-R).angle()%(2*math.pi), (P1-R).angle()%(2*math.pi), (P2-R).angle()%(2*math.pi)
-        alpha =  (p2a - p0a) % (2*math.pi)                    
-        if (p0a<p2a and  (p1a<p0a or p2a<p1a))    or    (p2a<p1a<p0a) : 
-            alpha = -2*math.pi+alpha 
+        alpha =  (p2a - p0a) % (2*math.pi)
+        if (p0a<p2a and  (p1a<p0a or p2a<p1a))    or    (p2a<p1a<p0a) :
+            alpha = -2*math.pi+alpha
         if abs(R.x)>1000000 or abs(R.y)>1000000  or (R-P0).mag<options.min_arc_radius :
             return None, None
-        else :    
+        else :
             return  R, alpha
     R1,a1 = calculate_arc_params(P0,P1,P2)
     R2,a2 = calculate_arc_params(P2,P3,P4)
     if R1==None or R2==None or (R1-P0).mag()<STRAIGHT_TOLERANCE or (R2-P2).mag()<STRAIGHT_TOLERANCE    : return [ [sp1[1],'line', 0, 0, sp2[1], [z1,z2]] ]
-    
+
     d = get_distance_from_csp_to_arc(sp1,sp2, [P0,P2,R1,a1],[P2,P4,R2,a2])
     if d > options.biarc_tolerance and depth<options.biarc_max_split_depth     : return biarc_split(sp1, sp2, z1, z2, depth)
     else:
         if R2.mag()*a2 == 0 : zm = z2
-        else : zm  = z1 + (z2-z1)*(R1.mag()*a1)/(R2.mag()*a2+R1.mag()*a1)  
+        else : zm  = z1 + (z2-z1)*(R1.mag()*a1)/(R2.mag()*a2+R1.mag()*a1)
         return [    [ sp1[1], 'arc', [R1.x,R1.y], a1, [P2.x,P2.y], [z1,zm] ], [ [P2.x,P2.y], 'arc', [R2.x,R2.y], a2, [P4.x,P4.y], [zm,z2] ]        ]
 
 
@@ -414,7 +414,7 @@ def parse_layer_name(txt):
     else:
         layerName = txt[0:n].strip()
         args = txt[n+1:].strip()
-        if (args.endswith("]")): 
+        if (args.endswith("]")):
             args = args[0:-1]
 
         for arg in args.split(","):
@@ -453,12 +453,12 @@ class Gcode_tools(inkex.Effect):
             outdir = os.getcwd()
 
         self.OptionParser.add_option("-d", "--directory",                action="store", type="string",         dest="directory", default=outdir,                help="Directory for gcode file")
-        self.OptionParser.add_option("-f", "--filename",                action="store", type="string",         dest="file", default="-1.0",                    help="File name")            
-        self.OptionParser.add_option("-u", "--Xscale",                    action="store", type="float",         dest="Xscale", default="1.0",                    help="Scale factor X")    
+        self.OptionParser.add_option("-f", "--filename",                action="store", type="string",         dest="file", default="-1.0",                    help="File name")
+        self.OptionParser.add_option("-u", "--Xscale",                    action="store", type="float",         dest="Xscale", default="1.0",                    help="Scale factor X")
         self.OptionParser.add_option("-v", "--Yscale",                    action="store", type="float",         dest="Yscale", default="1.0",                    help="Scale factor Y")
-        self.OptionParser.add_option("-x", "--Xoffset",                    action="store", type="float",         dest="Xoffset", default="0.0",                    help="Offset along X")    
+        self.OptionParser.add_option("-x", "--Xoffset",                    action="store", type="float",         dest="Xoffset", default="0.0",                    help="Offset along X")
         self.OptionParser.add_option("-y", "--Yoffset",                    action="store", type="float",         dest="Yoffset", default="0.0",                    help="Offset along Y")
-        # added move (laser off) feedrate and laser intensity; made all int rather than float - (ajf)																								   
+        # added move (laser off) feedrate and laser intensity; made all int rather than float - (ajf)
 
         self.OptionParser.add_option("-m", "--Mfeed",                    action="store", type="int",         dest="Mfeed", default="2000",                        help="Default Move Feed rate in unit/min")
         self.OptionParser.add_option("-p", "--feed",                    action="store", type="int",         dest="feed", default="300",                        help="Default Cut Feed rate in unit/min")
@@ -468,26 +468,26 @@ class Gcode_tools(inkex.Effect):
         self.OptionParser.add_option("",   "--draw-order",               action="store", type="string",       dest="draw_order", default="inside_first",          help="Drawing order ('inside-first', 'outside-first' or 'no_sort')")
 
 
-        self.OptionParser.add_option("",   "--biarc-tolerance",            action="store", type="float",         dest="biarc_tolerance", default="1",        help="Tolerance used when calculating biarc interpolation.")                
-        self.OptionParser.add_option("",   "--biarc-max-split-depth",    action="store", type="int",         dest="biarc_max_split_depth", default="4",        help="Defines maximum depth of splitting while approximating using biarcs.")                
+        self.OptionParser.add_option("",   "--biarc-tolerance",            action="store", type="float",         dest="biarc_tolerance", default="1",        help="Tolerance used when calculating biarc interpolation.")
+        self.OptionParser.add_option("",   "--biarc-max-split-depth",    action="store", type="int",         dest="biarc_max_split_depth", default="4",        help="Defines maximum depth of splitting while approximating using biarcs.")
 
         self.OptionParser.add_option("",   "--unit",                    action="store", type="string",         dest="unit", default="G21 (All units in mm)\n",    help="Units")
         self.OptionParser.add_option("",   "--function",                action="store", type="string",         dest="function", default="Curve",                help="What to do: Curve|Area|Area inkscape")
         self.OptionParser.add_option("",   "--tab",                        action="store", type="string",         dest="tab", default="",                            help="Means nothing right now. Notebooks Tab.")
-        self.OptionParser.add_option("",   "--generate_not_parametric_code",action="store", type="inkbool",    dest="generate_not_parametric_code", default=False,help="Generated code will be not parametric.")        
+        self.OptionParser.add_option("",   "--generate_not_parametric_code",action="store", type="inkbool",    dest="generate_not_parametric_code", default=False,help="Generated code will be not parametric.")
         self.OptionParser.add_option("",   "--double_sided_cutting",action="store", type="inkbool",    dest="double_sided_cutting", default=False,help="Generate code for double-sided cutting.")
-        self.OptionParser.add_option("",   "--draw-curves",                action="store", type="inkbool",    dest="drawCurves", default=False,help="Draws curves to show what geometry was processed")        
+        self.OptionParser.add_option("",   "--draw-curves",                action="store", type="inkbool",    dest="drawCurves", default=False,help="Draws curves to show what geometry was processed")
         self.OptionParser.add_option("",   "--logging",                 action="store", type="inkbool",    dest="logging", default=False, help="Enable output logging from the plugin")
 
         self.OptionParser.add_option("",   "--loft-distances",            action="store", type="string",         dest="loft_distances", default="10",            help="Distances between paths.")
         self.OptionParser.add_option("",   "--loft-direction",            action="store", type="string",         dest="loft_direction", default="crosswise",        help="Direction of loft's interpolation.")
         self.OptionParser.add_option("",   "--loft-interpolation-degree",action="store", type="float",        dest="loft_interpolation_degree", default="2",    help="Which interpolation use to loft the paths smooth interpolation or staright.")
 
-        self.OptionParser.add_option("",   "--min-arc-radius",            action="store", type="float",         dest="min_arc_radius", default="0.0005",            help="All arc having radius less than minimum will be considered as straight line")        
+        self.OptionParser.add_option("",   "--min-arc-radius",            action="store", type="float",         dest="min_arc_radius", default="0.0005",            help="All arc having radius less than minimum will be considered as straight line")
         self.OptionParser.add_option("",   "--mainboard",                    action="store", type="string",         dest="mainboard", default="ramps",    help="Mainboard")
         self.OptionParser.add_option("",   "--origin",                    action="store", type="string",         dest="origin", default="topleft",    help="Origin of the Y Axis")
-        
-		
+
+
     def parse_curve(self, path):
 #        if self.options.Xscale!=self.options.Yscale:
 #            xs,ys = self.options.Xscale,self.options.Yscale
@@ -495,7 +495,7 @@ class Gcode_tools(inkex.Effect):
 #        else :
         xs,ys = 1.0,1.0
 
-#            ### Sort to reduce Rapid distance    
+#            ### Sort to reduce Rapid distance
 #            np = [p[0]]
 #            del p[0]
 #            while len(p)>0:
@@ -503,13 +503,13 @@ class Gcode_tools(inkex.Effect):
 #                dist = None
 #                for i in range(len(p)):
 #                    start = p[i][0][1]
-#    
+#
 #                    dist = max(   ( -( ( end[0]-start[0])**2+(end[1]-start[1])**2 ) ,i)    ,   dist )
 #                np += [p[dist[1]][:]]
 #                del p[dist[1]]
-#            p = np[:]        
+#            p = np[:]
 
-        
+
         if(path['type'] ==  "vector") :
             lst = {}
             lst['type'] = "vector"
@@ -551,7 +551,7 @@ class Gcode_tools(inkex.Effect):
         for si in curve:
             if s!='':
                 if s[1] == 'line':
-                    inkex.etree.SubElement(    group, SVG_PATH_TAG, 
+                    inkex.etree.SubElement(    group, SVG_PATH_TAG,
                             {
                                 'style': style['line'],
                                 'd':'M %s,%s L %s,%s' % (s[0][0], s[0][1], si[0][0], si[0][1]),
@@ -563,17 +563,17 @@ class Gcode_tools(inkex.Effect):
                     sp = s[0]
                     c = s[2]
                     a =  ( (P(si[0])-P(c)).angle() - (P(s[0])-P(c)).angle() )%(2*math.pi) #s[3]
-                    if s[3]*a<0: 
+                    if s[3]*a<0:
                             if a>0:    a = a-2*math.pi
                             else: a = 2*math.pi+a
                     r = math.sqrt( (sp[0]-c[0])**2 + (sp[1]-c[1])**2 )
                     a_st = ( math.atan2(sp[0]-c[0],- (sp[1]-c[1])) - math.pi/2 ) % (math.pi*2)
                     if a>0:
                         a_end = a_st+a
-                    else: 
+                    else:
                         a_end = a_st*1
-                        a_st = a_st+a    
-                    inkex.etree.SubElement(    group, inkex.addNS('path','svg'), 
+                        a_st = a_st+a
+                    inkex.etree.SubElement(    group, inkex.addNS('path','svg'),
                          {
                             'style': style['biarc%s' % (arcn%2)],
                              inkex.addNS('cx','sodipodi'):        str(c[0]),
@@ -587,7 +587,7 @@ class Gcode_tools(inkex.Effect):
                             'comment': str(s)
                         })
             s = si
-    
+
 
     def check_dir(self):
         if (os.path.isdir(self.options.directory)):
@@ -603,10 +603,10 @@ class Gcode_tools(inkex.Effect):
                 f.close()
             else:
                 self.footer = FOOTER_TEXT
-        else: 
+        else:
             inkex.errormsg(("Directory specified for output gcode does not exist! Please create it."))
             return False
-        
+
         return True
 
     # Turns a list of arguments into gcode-style parameters (eg (1, 2, 3) -> "X1 Y2 Z3"),
@@ -616,7 +616,7 @@ class Gcode_tools(inkex.Effect):
         if c[5] == 0:
             c[5] = None
         # next few lines generate the stuff at the front of the file - scaling, offsets, etc (adina)
-        if self.options.generate_not_parametric_code: 
+        if self.options.generate_not_parametric_code:
             s = ["X", "Y", "Z", "I", "J", "K"]
             s1 = ["","","","","",""]
 
@@ -643,29 +643,29 @@ class Gcode_tools(inkex.Effect):
                 value = self.unitScale*(c[i]*m[i]+a[i])
                 args.append(s[i] + ("%f" % value) + s1[i])
         return " ".join(args)
-        
-        
+
+
     def generate_raster_gcode(self, curve, laserPower, altfeed=None):
         gcode = ''
         forward = True
-        
+
         #Setup our feed rate, either from the layer name or from the default value.
         if (altfeed):
             # Use the "alternative" feed rate specified
             cutFeed = "F%i" % altfeed
         else:
-            if self.options.generate_not_parametric_code: 
+            if self.options.generate_not_parametric_code:
                 cutFeed = "F%i" % self.options.feed
             else:
                 cutFeed = "F%i" % self.options.feed
-        
+
         #This extension assumes that your copy of Inkscape is running at 90dpi (it is by default)
         #R = mm per pixel
         #R = 1 / dots per mm
         #90dpi = 1 / (90 / 25.4)
         gcode += '\n\n;Beginning of Raster Image '+str(curve['id'])+' pixel size: '+str(curve['width'])+'x'+str(curve['height'])+'\n'
         gcode += 'M649 S'+str(laserPower)+' B2 D0 R0.09406\n'
-         
+
         #Do not remove these two lines, they're important. Will not raster correctly if feedrate is not set prior.
         #Move fast to point, cut at correct speed.
         if(cutFeed < self.options.Mfeed):
@@ -675,7 +675,7 @@ class Gcode_tools(inkex.Effect):
         #def get_chunks(arr, chunk_size = 51):
         def get_chunks(arr, chunk_size = 51):
             chunks  = [ arr[start:start+chunk_size] for start in range(0, len(arr), chunk_size)]
-            return chunks 
+            return chunks
 
         #return the last pixel that holds data.
         def last_in_list(arr):
@@ -683,7 +683,7 @@ class Gcode_tools(inkex.Effect):
             for i in range(len(arr)):
                 if (arr[i] > 0):
                     end = i
-                    
+
             return end
 
 
@@ -695,29 +695,29 @@ class Gcode_tools(inkex.Effect):
                     end = i
                 if (arr[i] > 0):
                     break
-                    
+
             return end
-            
-        first = True   
+
+        first = True
         #Flip the image top to bottom.
-        row = curve['data'][::-1] 
-        
+        row = curve['data'][::-1]
+
         #Turnkey - 29/3/15 - No more flipping.
         #row = curve['data']
 
         previousRight = 99999999999
         previousLeft  = 0
         firstRow = True
-        
+
         for index, rowData in enumerate(row):
-           
+
             splitRight = 0
             splitLeft = 0
-            
+
             if(index+1 < len(row)):
                 # Determine where to split the lines.
                 ##################################################
-                
+
                 #If the left most pixel of the next row is earlier than the current row, then extend.
                 if(first_in_list(row[index +1]) > first_in_list(rowData)):
                     splitLeft = first_in_list(rowData)
@@ -729,44 +729,44 @@ class Gcode_tools(inkex.Effect):
                     splitRight = last_in_list(row[index +1])
                 else:
                     splitRight = last_in_list(rowData)
-                
+
             else:
                 splitLeft = first_in_list(rowData)
                 splitRight = last_in_list(rowData)
-            
-                
+
+
             #Positive direction
-            if forward:                
+            if forward:
                 #Split the right side.
                 ###########################################
 
                 #Don't split more than the start of the last row as we print in reverse for alternate lines
                 splitLeft = previousLeft
                 previousRight = splitRight
-                
+
             #Negative direction
-            else:                
+            else:
                 #Split the left side.
                 ###########################################
-                
+
                 #Don't split more than the end of the last row as we print in reverse for alternate lines
                 splitRight = previousRight
                 previousLeft = splitLeft
-                    
-                
+
+
             #Exception to the rule : Don't split the left of the first row.
             if(firstRow):
                 splitLeft = (previousLeft)
-                
-            firstRow = False                
+
+            firstRow = False
             row2 = rowData[(splitLeft+1):(splitRight+1)]
-            
+
             if not forward:
                 result_row = row2[::-1]
             else:
                 result_row = row2
-                
-            
+
+
             for chunk in get_chunks(result_row,51):
                 if first:
                     if forward:
@@ -776,31 +776,31 @@ class Gcode_tools(inkex.Effect):
                     first = not first
                 else:
                     gcode +=  ("G7 ")
-                    
+
                 b64 = base64.b64encode("".join(chr(y) for y in chunk))
                 gcode += ("L"+str(len(b64))+" ")
                 gcode += ("D"+b64+ "\n")
             forward = not forward
             first = not first
-                
+
         gcode += ("M5 \n");
         gcode += ';End of Raster Image '+str(curve['id'])+'\n\n'
-        
+
         return gcode
-    
+
     def generate_gcode(self, curve, depth, laserPower, altfeed=None, altppm=None):
         gcode = ''
-        
+
         #Setup our feed rate, either from the layer name or from the default value.
         if (altfeed):
             # Use the "alternative" feed rate specified
             cutFeed = "F%i" % altfeed
         else:
-            if self.options.generate_not_parametric_code: 
+            if self.options.generate_not_parametric_code:
                 cutFeed = "F%i" % self.options.feed
             else:
                 cutFeed = "F%i" % self.options.feed
-                
+
         #Setup our pulse per millimetre option, if applicable
         #B: laser firing mode (0 = continuous, 1 = pulsed, 2 = raster)
         if (altppm):
@@ -813,7 +813,7 @@ class Gcode_tools(inkex.Effect):
 
         cwArc = "G02"
         ccwArc = "G03"
-		
+
 		# The geometry is reflected, so invert the orientation of the arcs to match
         if (self.flipArcs):
             (cwArc, ccwArc) = (ccwArc, cwArc)
@@ -828,7 +828,7 @@ class Gcode_tools(inkex.Effect):
                 #Turn off the laser if it was on previously.
                 if lg != "G00":
                     gcode += LASER_OFF + "\n"
-				
+
                 gcode += "G00" + " " + self.make_args(si[0]) + " F%i" % self.options.Mfeed + "\n"
                 lg = 'G00'
 
@@ -878,7 +878,7 @@ class Gcode_tools(inkex.Effect):
                     gcode += "G01 " + self.make_args(si[0]) + " %s " % cutFeed + "%s" % ppmValue + "\n"
                     lg = 'G01'
 
-    
+
         #The end of the layer.
         if si[1] == 'end':
             gcode += LASER_OFF + '\n'
@@ -892,8 +892,8 @@ class Gcode_tools(inkex.Effect):
         # Select the next available tool
         self.currentTool = (self.currentTool+1) % 32
         return gcode
-        
-    #Determine the tmp directory for the user's operating system.    
+
+    #Determine the tmp directory for the user's operating system.
     def getTmpPath(self):
 		"""Define the temporary folder path depending on the operating system"""
 
@@ -907,8 +907,8 @@ class Gcode_tools(inkex.Effect):
     ###        Curve to Gcode
     ###
     ################################################################################
-    
-    
+
+
     def effect_curve(self, selected):
         selected = list(selected)
 
@@ -919,13 +919,13 @@ class Gcode_tools(inkex.Effect):
 
         # Recursively compiles a list of paths that are decendant from the given node
         self.skipped = 0
-        
-        
+
+
         def compile_paths(parent, node, trans):
             # Apply the object transform, along with the parent transformation
             mat = node.get('transform', None)
             path = {}
-            
+
             if mat:
                 mat = simpletransform.parseTransform(mat)
                 trans = simpletransform.composeTransform(trans, mat)
@@ -936,11 +936,11 @@ class Gcode_tools(inkex.Effect):
                 # This is a path object
                 if (not node.get("d")): return []
                 csp = cubicsuperpath.parsePath(node.get("d"))
-                
+
                 path['type'] = "vector"
                 path['id'] = node.get("id")
                 path['data'] = []
-                
+
                 if (trans):
                     simpletransform.applyTransformToPath(trans, csp)
                     path['data'] = csp
@@ -957,125 +957,125 @@ class Gcode_tools(inkex.Effect):
                     else:
                         pathsGroup += data
                 return pathsGroup
-            
+
             else :
                 #Raster the results.
                 if(node.get("x") > 0):
                     tmp = self.getTmpPath() #OS tmp directory
                     bgcol = "#ffffff" #White
                     curfile = curfile = self.args[-1] #The current inkscape project we're exporting from.
-                    command="inkscape --export-dpi 270 -i %s --export-id-only -e \"%stmpinkscapeexport.png\" -b \"%s\" %s" % (node.get("id"),tmp,bgcol,curfile) 
-            
+                    command="inkscape --export-dpi 270 -i %s --export-id-only -e \"%stmpinkscapeexport.png\" -b \"%s\" %s" % (node.get("id"),tmp,bgcol,curfile)
+
                     p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     return_code = p.wait()
                     f = p.stdout
                     err = p.stderr
-                    
-                    
+
+
                     #Fetch the image Data
                     filename = "%stmpinkscapeexport.png" % (tmp)
                     if (self.options.origin == 'topleft'):
                         im = Image.open(filename).transpose(Image.FLIP_TOP_BOTTOM).convert('L')
                     else:
                         im = Image.open(filename).convert('L')
-                    img = ImageOps.invert(im) 
-                    
+                    img = ImageOps.invert(im)
+
                     #Get the image size
                     imageDataWidth, imageDataheight = img.size
-                    
+
                     #Compile the pixels.
                     pixels = list(img.getdata())
                     pixels = [pixels[i * (imageDataWidth):(i + 1) * (imageDataWidth)] for i in xrange(imageDataheight)]
-                    
+
                     path['type'] = "raster"
                     path['width'] = imageDataWidth
                     path['height'] = imageDataheight
-                    
-                    
+
+
                     #A slow, but reliable way of getting correct coordinates since working with inkscape transpositions and transforms is a major pain in the ass.
-                    #command="inkscape -X --query-id=%s %s" % (node.get("id"),curfile) 
+                    #command="inkscape -X --query-id=%s %s" % (node.get("id"),curfile)
                     #p2 = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     #return_code = p2.wait()
                     #text = p2.communicate()[0]
                     #x_position = float(text)
-                    #command="inkscape -Y --query-id=%s %s" % (node.get("id"),curfile) 
+                    #command="inkscape -Y --query-id=%s %s" % (node.get("id"),curfile)
                     #p3 = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     #return_code = p3.wait()
                     #text = p3.communicate()[0]
                     #y_position = float(text)*-1+self.pageHeight
-                    
+
                     if not hasattr(parent, 'glob_nodePositions'):
                         #Get the XY position of all elements in the inkscape job.
-                        command="inkscape -S %s" % (curfile) 
+                        command="inkscape -S %s" % (curfile)
                         p5 = subprocess.Popen(command, stdout=subprocess.PIPE)
                         dataString = str(p5.communicate()[0]).split('\r\n')
                         del dataString[-1]
                         elementList = dict((item.split(",",1)[0],item.split(",",1)[1]) for item in dataString)
                         parent.glob_nodePositions = elementList
-                    
+
                     #Lookup the xy coords for this node.
                     elementData = parent.glob_nodePositions[node.get("id")].split(',')
                     x_position = float(elementData[0])
                     y_position = float(elementData[1])*-1+self.pageHeight
-                    
-                    
+
+
                     #Text is y positioned from the top left.
                     if (self.options.origin == 'topleft'):
                         #Don't flip the y position. Since we're moving the origin from bottom left to top left.
                         y_position = float(elementData[1])
-                    else:   
+                    else:
                         #Very small loss of positioning due to conversion of the dpi in the exported image.
-                        y_position -= imageDataheight/3 
-                    
-                    
+                        y_position -= imageDataheight/3
+
+
                     #Convert from pixels to mm
                     path['x'] = float(str("%.3f") %(self.unitScale * x_position))
-                    path['y'] = float(str("%.3f") %(self.unitScale * y_position)) 
-                    
+                    path['y'] = float(str("%.3f") %(self.unitScale * y_position))
+
                     #Do not permit being < 0
                     if(path['y'] < 0):
                         path['y'] = 0
-                        
+
                     if(path['x'] < 0):
                         path['x'] = 0
-                    
+
                     path['id'] = node.get("id")
                     path['data'] = pixels
-                
+
                     return path
                 else:
                     inkex.errormsg("Unable to generate raster for object " + str(node.get("id"))+" as it does not have an x-y coordinate associated.")
-            
+
             """
                 elif node.tag == SVG_IMAGE_TAG:
-                #inkex.errormsg( ) 
-                
+                #inkex.errormsg( )
+
                 #Work together to destroy
-                
+
                 #visit https://www.python.org/downloads/ and download python 2.7.9
                 #Install it
                 #In the folder : C:\Program Files\Inkscape you will need to rename the folder "Python" to "Python-old" so it uses the new system install instead.
                 #pip install wheel
                 #From http://www.lfd.uci.edu/~gohlke/pythonlibs/#pil , download "Pillow-2.7.0-cp27-none-win32.whl"
                 #pip install Pillow-2.7.0-cp27-none-win32.whl
-                #You're good to go!     
-                
+                #You're good to go!
+
                 #Fetch the image Data
-                inkscapeWidth = int(float(node.get("width"))) 
+                inkscapeWidth = int(float(node.get("width")))
                 inkscapeHeight = int(float(node.get("height")))
                 data = str((node.get(inkex.addNS('href','xlink')) )).replace("data:image/png;base64,","").replace("data:image/jpeg;base64,","")
                 im = Image.open(BytesIO(base64.b64decode(data))).convert('L')
-                img = ImageOps.invert(im) 
-                
+                img = ImageOps.invert(im)
+
                 imageDataWidth, imageDataheight = img.size
                 #Resize to match the dimensions in Inkscape
                 im_resized = img.resize((inkscapeWidth*3, inkscapeHeight*3), Image.ANTIALIAS)
-                
+
                 #Resize the image here for highter DPI - say 300dpi
                 #Compile the pixels.
                 pixels = list(im_resized.getdata())
                 pixels = [pixels[i * (inkscapeWidth*3):(i + 1) * (inkscapeWidth * 3)] for i in xrange(inkscapeHeight*3)]
-                
+
                 path['type'] = "raster"
                 path['width'] = inkscapeWidth
                 path['height'] = inkscapeHeight
@@ -1084,19 +1084,19 @@ class Gcode_tools(inkex.Effect):
                 path['y'] =  self.unitScale * ((float(node.get("y"))+float(node.get("height")))*-1+self.pageHeight)
                 path['id'] = node.get("id")
                 path['data'] = pixels
-                
+
                 #inkex.errormsg(str(path))
-                
+
                 return path
             #The object isn't a path, and it's not an image. Convert it to an image to be rastered.
             """
-            
+
             inkex.errormsg("skipping node " + str(node.get("id")))
             self.skipped += 1
             return []
 
         # Compile a list of layers in this document. We compile a list of only the layers
-        # we need to use, so we can know ahead of time whether to put tool change 
+        # we need to use, so we can know ahead of time whether to put tool change
         # operations between them.
         layers = []
         for layer in reversed(get_layers(self.document)):
@@ -1143,14 +1143,14 @@ class Gcode_tools(inkex.Effect):
             for node in layer.iterchildren():
                 if (node in selected):
                     #Vector path data, cut from x to y in a line or curve
-                    
+
                     logger.write("node %s" % str(node.tag))
-                    selected.remove(node) 
-                        
-                        
+                    selected.remove(node)
+
+
                     try:
                         newPath = compile_paths(self, node, trans).copy();
-                        pathList.append(newPath)       
+                        pathList.append(newPath)
                         inkex.errormsg("Built gcode for "+str(node.get("id"))+" - will be cut as %s." % (newPath['type']) )
                     except:
                         messageOnce = True
@@ -1159,7 +1159,7 @@ class Gcode_tools(inkex.Effect):
                             inkex.errormsg("Built gcode for group "+str(node.get("id"))+", item %s - will be cut as %s." % (objectData['id'], objectData['type']) )
                                 #messageOnce = False
                             pathList.append(objectData)
-                    
+
                 else:
                     logger.write("skipping node %s" % node)
 
@@ -1171,7 +1171,7 @@ class Gcode_tools(inkex.Effect):
             #If the layer is not named as an integer value then default to the laser intensity set at the export settings.
             #Fetch the laser power from the export dialog box.
             laserPower = self.options.laser
-            
+
             try:
                 if (int(layerName) >= 0 and int(layerName) <= 255):
                     laserPower = int(layerName)
@@ -1180,21 +1180,21 @@ class Gcode_tools(inkex.Effect):
             except ValueError,e:
                 laserPower = self.options.laser
                 inkex.errormsg("Unable to parse power level for layer name. Using default power level %d." % (self.options.laser))
-                
-            
-            
+
+
+
             #Switch between smoothie power levels and ramps+marlin power levels
             #ramps and marlin expect 0 to 100 while smoothie wants 0.0 to 1.0
             if (self.options.mainboard == 'smoothie'):
                 laserPower = float(laserPower) / 100
-                
+
 
             #Fetch the vector or raster data and turn it into GCode
             for objectData in pathList:
                 curve = self.parse_curve(objectData)
-            
+
                 header_data = ""
-               
+
                 #Turnkey : Always output the layer header for information.
                 if (len(layers) > 0):
                     header_data += LASER_OFF+"\n"
@@ -1207,19 +1207,19 @@ class Gcode_tools(inkex.Effect):
                         header_data += (";(***** Pulse Rate: %%-%ds *****)\n" % (size-24)) % (altppm)
                     header_data += ";(%s)\n" % ("*"*size)
                     header_data += ";(MSG,Starting layer '%s')\n\n" % originalLayerName
-                    
+
                 #Generate the GCode for this layer
                 if (curve['type'] == "vector"):
                     #Should the curves be drawn in inkscape?
                     if (self.options.drawCurves):
                         self.draw_curve(curve)
-                    
+
                     gcode += header_data+self.generate_gcode(curve, 0, laserPower, altfeed=altfeed, altppm=altppm)
                 elif (curve['type'] == "raster"):
                     gcode_raster += header_data+self.generate_raster_gcode(curve, laserPower, altfeed=altfeed)
 
-                    
-        #Turnkey - Need to figure out why inkscape sometimes gets to this point and hasn't found the objects above.            
+
+        #Turnkey - Need to figure out why inkscape sometimes gets to this point and hasn't found the objects above.
         # If there are any objects left over, it's because they don't belong
         # to any inkscape layer (bug in inkscape?). Output those now.
         if (selected):
@@ -1229,7 +1229,7 @@ class Gcode_tools(inkex.Effect):
             for node in selected:
                 try:
                     newPath = compile_paths(self, node, trans).copy();
-                    pathList.append(newPath)       
+                    pathList.append(newPath)
                     inkex.errormsg("Built gcode for "+str(node.get("id"))+" - will be cut as %s." % (newPath['type']) )
                 except:
                     messageOnce = True
@@ -1239,19 +1239,19 @@ class Gcode_tools(inkex.Effect):
                             #messageOnce = False
                         pathList.append(objectData)
 
-            if (pathList):  
-            
-                
-                
+            if (pathList):
+
+
+
                 for objectData in pathList:
-                    
+
                     curve = self.parse_curve(objectData)
-                
+
                     #Determind the power of the laser that this layer should be cut at.
                     #If the layer is not named as an integer value then default to the laser intensity set at the export settings.
                     #Fetch the laser power from the export dialog box.
                     laserPower = self.options.laser
-                    
+
                     try:
                         if (int(layerName) >= 0 and int(layerName) <= 255):
                             laserPower = int(layerName)
@@ -1260,12 +1260,12 @@ class Gcode_tools(inkex.Effect):
                     except ValueError,e:
                         laserPower = self.options.laser
                         inkex.errormsg("Unable to parse power level for layer name. Using default power level %d." % (self.options.laser))
-                    
+
                     #Switch between smoothie power levels and ramps+marlin power levels
                     #ramps and marlin expect 0 to 100 while smoothie wants 0.0 to 1.0
                     if (self.options.mainboard == 'smoothie'):
                         laserPower = float(laserPower) / 100
-                        
+
                     header_data = ""
                     #Turnkey : Always output the layer header for information.
                     if (len(layers) > 0):
@@ -1279,24 +1279,24 @@ class Gcode_tools(inkex.Effect):
                             header_data += (";(***** Pulse Rate: %%-%ds *****)\n" % (size-24)) % (altppm)
                         header_data += ";(%s)\n" % ("*"*size)
                         header_data += ";(MSG,Starting layer '%s')\n\n" % originalLayerName
-                        
+
                     #Generate the GCode for this layer
                     if (curve['type'] == "vector"):
                         #Should the curves be drawn in inkscape?
                         if (self.options.drawCurves):
                             self.draw_curve(curve)
-                        
+
                         gcode += header_data+self.generate_gcode(curve, 0, laserPower, altfeed=altfeed, altppm=altppm)
                     elif (curve['type'] == "raster"):
                         gcode_raster += header_data+self.generate_raster_gcode(curve, laserPower, altfeed=altfeed)
-                  
+
         if self.options.homeafter:
             gcode += "\n\nG00 X0 Y0 F4000 ; home"
-       
-       
+
+
         #Always raster before vector cutting.
         gcode = gcode_raster+"\n\n"+gcode
-        
+
         return gcode
 
     def effect(self):
@@ -1307,11 +1307,11 @@ class Gcode_tools(inkex.Effect):
         root = self.document.getroot()
         #See if the user has the document setup in mm or pixels.
         try:
-            self.pageHeight = float(root.get("height", None))                           
+            self.pageHeight = float(root.get("height", None))
         except:
             inkex.errormsg(("Please change your inkscape project units to be in pixels, not inches or mm. In Inkscape press ctrl+shift+d and change 'units' on the page tab to px. The option 'default units' can be set to mm or inch, these are the units displayed on your rulers."))
             return
-        
+
         self.flipArcs = (self.options.Xscale*self.options.Yscale < 0)
         self.currentTool = 0
 
@@ -1354,7 +1354,7 @@ class Gcode_tools(inkex.Effect):
 
         if not self.options.generate_not_parametric_code:
             gcode += """
-; Raster data will always precede vector data           
+; Raster data will always precede vector data
 ; Default Cut Feedrate %i mm per minute
 ; Default Move Feedrate %i mm per minute
 ; Default Laser Intensity %i percent\n""" % (self.options.feed, self.options.Mfeed, self.options.laser)
@@ -1381,10 +1381,10 @@ class Gcode_tools(inkex.Effect):
             gcode += self.effect_curve(selected)
 
         try:
-            f = open(self.options.directory+'/'+self.options.file, "w")    
+            f = open(self.options.directory+'/'+self.options.file, "w")
             f.write(gcode + self.footer)
-            f.close()                            
-        except: 
+            f.close()
+        except:
             inkex.errormsg(("Can not write to specified file!"))
             return
 
@@ -1394,4 +1394,3 @@ class Gcode_tools(inkex.Effect):
 e = Gcode_tools()
 e.affect()
 inkex.errormsg("Finished processing.")
-
