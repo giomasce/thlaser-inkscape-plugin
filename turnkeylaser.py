@@ -162,6 +162,8 @@ class Logger(object):
 # The global logger object
 logger = Logger()
 
+#logger.write(" ".join(sys.argv))
+
 
 ###
 ###        Point (x,y) operations
@@ -512,10 +514,6 @@ class Gcode_tools(inkex.Effect):
             lst = {}
             lst['type'] = "vector"
             lst['data'] = []
-
-            #with open("/tmp/tmp", 'w+') as fdebug:
-            #    import pprint
-            #    fdebug.write(pprint.pformat(path['data']) + '\n\n')
 
             # If we sort with respect to the area of the BB, we have
             # more or less draw first things inside. It is good to
@@ -932,6 +930,8 @@ class Gcode_tools(inkex.Effect):
                 mat = simpletransform.parseTransform(mat)
                 trans = simpletransform.composeTransform(trans, mat)
 
+            logger.write("trans = %r" % (trans))
+
             if node.tag == SVG_PATH_TAG:
                 # This is a path object
                 if (not node.get("d")): return []
@@ -1338,11 +1338,15 @@ class Gcode_tools(inkex.Effect):
 
         gcode = self.header;
 
+        # Here it is assumed that one Inkscape base unit is 1/90 of an
+        # inch (this is true up to Inkscape 0.91, as indicated in
+        # http://wiki.inkscape.org/wiki/index.php/Units_In_Inkscape;
+        # then it should pass to the CSS standards 1/96)
         if (self.options.unit == "mm"):
-            self.unitScale = 0.282222222222
+            self.unitScale = 25.4 / 90.0
             gcode += "G21 ; All units in mm\n"
         elif (self.options.unit == "in"):
-            self.unitScale = 0.011111
+            self.unitScale = 1.0 / 90.0
             gcode += "G20 ; All units in in\n"
         else:
             inkex.errormsg(("You must choose mm or in"))
