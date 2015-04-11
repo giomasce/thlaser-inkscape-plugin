@@ -81,6 +81,8 @@ import re
 import copy
 import sys
 import time
+import traceback
+import pprint
 
 #Image processing for rastering
 import base64
@@ -393,6 +395,7 @@ def biarc(sp1, sp2, z1, z2, depth=0,):
 
 # Returns true if the given node is a layer
 def is_layer(node):
+    logger.write("Considering tag %s with groupmode %s" % (node.tag, node.get(inkex.addNS("groupmode", "inkscape"), None)))
     return (node.tag == SVG_GROUP_TAG and
             node.get(inkex.addNS("groupmode", "inkscape")) == "layer")
 
@@ -401,6 +404,7 @@ def get_layers(document):
     root = document.getroot()
     for node in root.iterchildren():
         if (is_layer(node)):
+            logger.write("FOUND!")
             # Found an inkscape layer
             layers.append(node)
     return layers
@@ -930,7 +934,8 @@ class Gcode_tools(inkex.Effect):
                 mat = simpletransform.parseTransform(mat)
                 trans = simpletransform.composeTransform(trans, mat)
 
-            logger.write("trans = %r" % (trans))
+            logger.write("traceback: %s" % ("".join(traceback.format_stack())))
+            logger.write("id = %s; trans = %r" % (node.get('id', ''), trans))
 
             if node.tag == SVG_PATH_TAG:
                 # This is a path object
@@ -1099,18 +1104,22 @@ class Gcode_tools(inkex.Effect):
         # we need to use, so we can know ahead of time whether to put tool change
         # operations between them.
         layers = []
+        logger.write("layers = %r" % (layers))
         for layer in reversed(get_layers(self.document)):
             for node in layer.iterchildren():
                 if (node in selected):
                     layers.append(layer)
                     break
 
+        logger.write("layers = %r" % (layers))
         layers = list(reversed(get_layers(self.document)))
+        logger.write("layers = %r" % (layers))
 
         # Loop over the layers and objects
         gcode = ""
         gcode_raster = ""
         for layer in layers:
+            logger.write("Looping over %r" % (layer))
             label = layer.get(SVG_LABEL_TAG).strip()
             if (label.startswith("#")):
                 # Ignore everything selected in this layer
@@ -1118,6 +1127,8 @@ class Gcode_tools(inkex.Effect):
                     if (node in selected):
                         selected.remove(node)
                 continue
+
+            logger.write("Was not cut")
 
             # Parse the layer label text, which consists of the layer name followed
             # by an optional number of arguments in square brackets.
@@ -1127,6 +1138,8 @@ class Gcode_tools(inkex.Effect):
             except ValueError,e:
                 inkex.errormsg("Your inkscape layer is named incorrectly. Please use the format '20 [ppm=40,feed=300]' without the quotes. This would set the power at 20%, cutting at 300mm per minute at a pulse rate of 40 pulse per millimetre. The ppm option is optional, leaving it out will set the laser to continuous wave mode.")
                 return
+
+            logger.write("Saluti!")
 
             # Check if the layer specifies an alternative (from the default) feed rate
             altfeed = layerParams.get("feed", self.options.feed)
@@ -1140,7 +1153,12 @@ class Gcode_tools(inkex.Effect):
             trans = layer.get('transform', None)
             trans = simpletransform.parseTransform(trans)
 
+            logger.write("Layer has transform %r" % (trans))
+
             for node in layer.iterchildren():
+                logger.write("node = %r, selected = %r" % (node, selected))
+                # Next line is wrong: you loose objects that
+                # indirectly belong to the layer's child
                 if (node in selected):
                     #Vector path data, cut from x to y in a line or curve
 
@@ -1222,7 +1240,7 @@ class Gcode_tools(inkex.Effect):
         #Turnkey - Need to figure out why inkscape sometimes gets to this point and hasn't found the objects above.
         # If there are any objects left over, it's because they don't belong
         # to any inkscape layer (bug in inkscape?). Output those now.
-        if (selected):
+        if (selected) and False:
             pathList = []
             # Use the identity transform (eg no transform) for the root objects
             trans = simpletransform.parseTransform("")
