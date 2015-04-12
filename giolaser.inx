@@ -38,9 +38,8 @@ For the latest revision please visit https://github.com/TurnkeyTyranny/laser-gco
     </page>
 
     <page name='tab' _gui-text='Advanced'>
-      <param name="mainboard" type="enum" _gui-text="Mainboard: ">
-        <item value="ramps">Ramps 1.4</item>
-        <item value="smoothie">Smoothie</item>
+      <param name="board" type="enum" _gui-text="Control board: ">
+        <item value="gio_rumba">Gio's Rumba</item>
       </param>
       <param name="biarc-tolerance" type='float' _gui-text='Biarc interpolation tolerance'>0.5</param>
       <_param name="help" type="description">Biarc interpolation tolerance is the maximum allowed distance between a path and it's approximation. If this value is exceeded, the path will be split into two segments.</_param>
@@ -48,26 +47,23 @@ For the latest revision please visit https://github.com/TurnkeyTyranny/laser-gco
       <param name="min-arc-radius" type="float" precision="5" min="-1000" max="5000"  _gui-text="Minimum arc radius">0.00005</param>
       <param name="xoffset" type="float" precision="4" min="-1000" max="1000" _gui-text="Offset along X axis">0.0</param>
       <param name="yoffset" type="float" precision="4" min="-1000" max="1000" _gui-text="Offset along Y axis">0.0</param>
-      <param name="logging" type="boolean" _gui-text="Log debug output from plugin:">true</param>
     </page>
 
     <page name='tab' _gui-text='Preferences'>
-      <param name="origin" type="enum" _gui-text="Y Axis Origin: ">
+      <param name="origin" type="enum" _gui-text="Origin position: ">
         <item value="topleft">Top Left</item>
-        <item value="bottomright">Bottom Left</item>
+        <item value="bottomleft">Bottom Left</item>
       </param>
       <_param name="help" type="description">Choose the location your laser head parks at home and cuts from</_param>
       <param name="filename" type="string" _gui-text="File name: ">/tmp/output.g</param>
-      <param name="feed" type="int" min="0" max="5000" _gui-text="Default Cut Feedrate:">300</param>
-      <param name="Mfeed" type="int" min="0" max="5000" _gui-text="Default Traversal Feedrate:">2000</param>
+      <param name="feed" type="int" min="0" max="5000" _gui-text="Default cut feedrate (unit/min):">1000</param>
+      <param name="move-feed" type="int" min="0" max="5000" _gui-text="Default move feedrate (unit/min):">5000</param>
       <param name="laser" type="int" min="0" max="255" _gui-text="Default Laser Intensity (0-255):">255</param>
-      <param name="homebefore" type="boolean" _gui-text="Home X and Y Before:">true</param>
-      <param name="homeafter" type="boolean" _gui-text="Home X and Y After:">false</param>
+      <param name="home-before" type="boolean" _gui-text="Home X and Y Before (G28):">true</param>
+      <param name="home-after" type="boolean" _gui-text="Home X and Y After (G0):">true</param>
 
       <param name="xscale" type="float" precision="4" min="-1000" max="1000" _gui-text="Scale along X axis:">1</param>
       <param name="yscale" type="float" precision="4" min="-1000" max="1000" _gui-text="Scale along Y axis:">1</param>
-      <param name="double_sided_cutting" type="boolean" _gui-text="Cut both sides of material?">false</param>
-      <param name="draw-curves" type="boolean" _gui-text="Draw curves in inkscape layer">true</param>
 
       <param name="unit" type="enum" _gui-text="Units: ">
         <item value="mm">mm</item>

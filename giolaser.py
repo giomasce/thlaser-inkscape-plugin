@@ -11,6 +11,9 @@ class GioLaser(inkex.Effect):
         self.OptionParser.add_option("-f", "--filename",
                                      action="store", type="string", dest="filename", default=None,
                                      help="File name.")
+        self.OptionParser.add_option("",   "--board",
+                                     action="store", type="string", dest="board", default="gio_rumba",
+                                     help="Control board.")
 
         # Scaling and offset
         self.OptionParser.add_option("-u", "--xscale",
@@ -26,12 +29,13 @@ class GioLaser(inkex.Effect):
                                      action="store", type="float", dest="yoffset", default=0.0,
                                      help="Offset along Y.")
 
+        # Drawing
         self.OptionParser.add_option("-m", "--move-feed",
                                      action="store", type="int", dest="move_feed", default="2000",
-                                     help="Default move feed rate in unit/min.")
+                                     help="Default move feedrate in unit/min.")
         self.OptionParser.add_option("-p", "--feed",
                                      action="store", type="int", dest="feed", default="300",
-                                     help="Default cut feed rate in unit/min.")
+                                     help="Default cut feedrate in unit/min.")
         self.OptionParser.add_option("-l", "--laser",
                                      action="store", type="int", dest="laser", default="255",
                                      help="Default laser intensity (0-255).")
@@ -44,21 +48,25 @@ class GioLaser(inkex.Effect):
         self.OptionParser.add_option("",   "--draw-order",
                                      action="store", type="string", dest="draw_order", default="inside_first",
                                      help="Drawing order ('inside-first', 'outside-first' or 'no_sort').")
+        self.OptionParser.add_option("",   "--origin",
+                                     action="store", type="string", dest="origin", default="topleft",
+                                     help="Origin position (topleft or bottomleft).")
 
+        # Tolerances and approximations
         self.OptionParser.add_option("",   "--biarc-tolerance",
                                      action="store", type="float", dest="biarc_tolerance", default="1",
                                      help="Tolerance used when calculating biarc interpolation.")
         self.OptionParser.add_option("",   "--biarc-max-split-depth",
                                      action="store", type="int", dest="biarc_max_split_depth", default="4",
                                      help="Defines maximum depth of splitting while approximating using biarcs.")
+        self.OptionParser.add_option("",   "--min-arc-radius",
+                                     action="store", type="float", dest="min_arc_radius", default="0.0005",
+                                     help="All arc having radius less than minimum will be considered as straight line")
 
+        # Tweaks
         self.OptionParser.add_option("",   "--unit",
                                      action="store", type="string", dest="unit", default="mm",
                                      help="Units")
-
-        self.OptionParser.add_option("",   "--min-arc-radius",            action="store", type="float",         dest="min_arc_radius", default="0.0005",            help="All arc having radius less than minimum will be considered as straight line")
-        self.OptionParser.add_option("",   "--mainboard",                    action="store", type="string",         dest="mainboard", default="ramps",    help="Mainboard")
-        self.OptionParser.add_option("",   "--origin",                    action="store", type="string",         dest="origin", default="topleft",    help="Origin of the Y Axis")
 
         self.OptionParser.add_option("",   "--tab",
                                      action="store", type="string", dest="tab", default="",
@@ -66,6 +74,7 @@ class GioLaser(inkex.Effect):
 
 def main():
     gio_laser = GioLaser()
+    gio_laser.affect()
 
 if __name__ == '__main__':
     main()
