@@ -1159,11 +1159,11 @@ class Gcode_tools(inkex.Effect):
                 logger.write("node = %r, selected = %r" % (node, selected))
                 # Next line is wrong: you loose objects that
                 # indirectly belong to the layer's child
-                if (node in selected):
+                if (node in selected) or True:
                     #Vector path data, cut from x to y in a line or curve
 
                     logger.write("node %s" % str(node.tag))
-                    selected.remove(node)
+                    #selected.remove(node)
 
 
                     try:
