@@ -83,6 +83,62 @@ BOARDS = {
     'gio_rumba': GioRumba,
 }
 
+def scalar(c1, c2):
+    return (c1 * c2.conjugate()).real
+
+def cross(c1, c2):
+    return (c1 * c2.conjugare()).imag
+
+def simple_biarc(p1, t1, p2, t2):
+    """Compute the biarc interpolation between two points.
+
+    Use the algorithm in
+    http://www.ryanjuckett.com/programming/biarc-interpolation/
+    """
+    p1 = complex(*p1)
+    p2 = complex(*p2)
+    t1 = complex(*t1)
+    t1 /= abs(t1)
+    t2 = complex(*t2)
+    t2 /= abs(t2)
+
+    v = p2 - p1
+    t = t1 + t2
+
+    # Compute d, set as d = d2 = d1 (as in "Choosing d1")
+    sc_vt = scalar(v, t)
+    sc_tt = scalar(t1, t2)
+    discr = sc_vt ** 2 + 2 * (1 - sc_tt) * scalar(v, v)
+    assert discr >= 0.0
+    if sc_tt != 1.0:
+        # Case 1
+        d = (discr ** 0.5 - sc_vt) / (2 * (1 - sc_tt))
+    else:
+        sc_vt2 = scal(v, t2)
+        if sc_vt2 != 0.0:
+            # Case 2
+            d = sc_vv / (4 * sc_vt2)
+        else:
+            # Case 3
+            raise NotImplementedError()
+
+    # Compute pm (as in "Finding the Connection")
+    q1 = p1 + d * t1
+    q2 = p2 + d * t2
+    pm = 0.5 * (q1 + q2)
+
+    # Compute the centers and radii (as in "Finding the Center")
+    n1 = 1j * t1
+    n2 = 1j * t2
+    s1 = 0.5 * scal(pm - p1, pm - p1) / scal(n1, pm - p1)
+    s2 = 0.5 * scal(pm - p2, pm - p2) / scal(n2, pm - p2)
+    c1 = p1 + s1 * n1
+    c2 = p2 + s2 * n2
+    r1 = abs(s1)
+    r2 = abs(s2)
+
+    # TODO
+
 class GioLaser(inkex.Effect):
 
     def __init__(self):
@@ -111,7 +167,9 @@ class GioLaser(inkex.Effect):
 
         # Drawing
         self.OptionParser.add_option("-m", "--move-feed",
-                                     action="store", type="float", dest="move_feed", default="2000.0",
+                                     actio
+
+    n="store", type="float", dest="move_feed", default="2000.0",
                                      help="Default move feedrate in unit/min.")
         self.OptionParser.add_option("-p", "--feed",
                                      action="store", type="float", dest="feed", default="300.0",
@@ -210,6 +268,16 @@ class GioLaser(inkex.Effect):
         else:
             inkex.errormsg("Cannot parse node with tag %s" % (node.tag))
 
+    def generate_gcurves_cubic(self, gcurves, old, first, second, new):
+        """Compute the recursive biarc interpolation that describes a cubic curve.
+
+        Points are assumed to have already been transformed according
+        to current transformation.
+
+        """
+        # STUB
+        gcurves.append(('line', old, new))
+
     def generate_gcurves(self, path):
         gcurves = []
         mat = path.transform
@@ -217,15 +285,30 @@ class GioLaser(inkex.Effect):
             return (mat[0][0] * p[0] + mat[0][1] * p[1] + mat[0][2],
                     mat[1][0] * p[0] + mat[1][1] * p[1] + mat[1][2])
         current = (0.0, 0.0)
+        beginning = None
         for op in path.data:
+            assert len(op) == 2
             code = op[0]
             if code == 'M':
-                assert len(op) == 2
+                assert len(op[1]) == 2
                 current = tuple(op[1])
+                beginning = current
             elif code == 'L':
-                assert len(op) == 2
+                assert len(op[1]) == 2
                 new = tuple(op[1])
                 gcurves.append(('line', trans(current), trans(new)))
+                current = new
+            elif code == 'Z':
+                assert len(op[1]) == 0
+                gcurves.append(('line', trans(current), trans(beginning)))
+                current = beginning
+            elif code == 'C':
+                assert len(op[1]) == 6
+                first = tuple(op[1][0:2])
+                second = tuple(op[1][2:4])
+                new = tuple(op[1][4:6])
+                self.generate_gcurves_cubic(gcurves, trans(current),trans(first),
+                                            trans(second), trans(new))
                 current = new
             else:
                 inkex.errormsg("Code %s not supported (so far...)" % (code))
@@ -277,8 +360,8 @@ class GioLaser(inkex.Effect):
         gcurves = []
         for path in self.list_deep_paths(layer, trans):
             #self.board.write_comment('\nPath with id: %s\n\n' % (path.id))
-            #self.board.write_comment(pprint.pformat(path.transform))
-            #self.board.write_comment(pprint.pformat(path.data))
+            self.board.write_comment(pprint.pformat(path.transform))
+            self.board.write_comment(pprint.pformat(path.data))
             gcurves += self.generate_gcurves(path)
         #self.board.write_comment(pprint.pformat(gcurves))
 
