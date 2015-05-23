@@ -36,6 +36,7 @@ class GioRumba:
         self.foutput = foutput
         self.time = 0.0
         self.position = (0.0, 0.0)
+        self.foutput.write("M106 S255\n")
 
     def home(self):
         self.foutput.write("G28\n")
@@ -167,9 +168,7 @@ class GioLaser(inkex.Effect):
 
         # Drawing
         self.OptionParser.add_option("-m", "--move-feed",
-                                     actio
-
-    n="store", type="float", dest="move_feed", default="2000.0",
+                                     action="store", type="float", dest="move_feed", default="2000.0",
                                      help="Default move feedrate in unit/min.")
         self.OptionParser.add_option("-p", "--feed",
                                      action="store", type="float", dest="feed", default="300.0",
@@ -327,6 +326,8 @@ class GioLaser(inkex.Effect):
                     self.board.laser_on(params['laser'])
                 self.board.move(curve[2][0], curve[2][1], params['feed'])
                 current = tuple(curve[2])
+            else:
+                raise NotImplementedError()
 
     def process_layer(self, layer):
         # If the layer's label begins with "#", then we ignore it
