@@ -83,7 +83,7 @@ import re
 import copy
 import sys
 import time
-_ = inkex._
+#_ = inkex._
 
 
 ################################################################################
