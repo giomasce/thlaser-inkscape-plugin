@@ -319,6 +319,9 @@ class GioLaser(inkex.Effect):
                 break
         return gcurves
 
+    def sort_gcurves(self, gcurves):
+        pass
+
     def generate_gcode(self, gcurves, params):
         current = None
         for curve in gcurves:
@@ -371,7 +374,11 @@ class GioLaser(inkex.Effect):
             gcurves += self.generate_gcurves(path)
         #self.board.write_comment(pprint.pformat(gcurves))
 
-        # TODO: decide best order to draw
+        # Decide best order to draw
+        if self.options.draw_order in ['inside_first', 'outside_first']:
+            self.sort_gcurves(gcurves)
+            if self.options.draw_order == 'inside_first':
+                gcurves.reverse()
 
         # Actually draw
         self.generate_gcode(gcurves, params)
