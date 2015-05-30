@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import math
+import cmath
 import pprint
 import collections
 
@@ -16,7 +17,7 @@ import bezmisc
 # http://wiki.inkscape.org/wiki/index.php/Units_In_Inkscape)
 DEFAULT_DPI = 90.0
 
-CONTINUITY_TOLERANCE = 0.01
+CONTINUITY_TOLERANCE = 0.001
 
 SVG_GROUP_TAG = inkex.addNS("g", "svg")
 SVG_PATH_TAG = inkex.addNS('path','svg')
@@ -319,8 +320,94 @@ class GioLaser(inkex.Effect):
                 break
         return gcurves
 
-    def sort_gcurves(self, gcurves):
-        pass
+    def invert_gcurve(self, gcurve):
+        code = gcurve[0]
+        if code == 'line':
+            return ('line', gcurve[2], gcurve[1])
+        elif code == 'cw_arc':
+            return ('ccw_arc', gcurve[2], gcurve[1], gcurve[3])
+        elif code == 'ccw_arc':
+            return ('cw_arc', gcurve[2], gcurve[1], gcurve[3])
+        else:
+            return Exception("Should not arrive here")
+
+    def compute_gcurve_tangent(self, gcurve):
+        code = gcurve[0]
+        if code == 'line':
+            res = cmath.phase(complex(*gcurve[2]) - complex(*gcurve[1]))
+        elif code == 'cw_arc':
+            res = cmath.phase(complex(*gcurve[3]) - complex(*gcurve[1])) + 0.5 * math.pi
+        elif code == 'ccw_arc':
+            res = cmath.phase(complex(*gcurve[3]) - complex(*gcurve[1])) - 0.5 * math.pi
+        else:
+            return Exception("Should not arrive here")
+        res = res % (2 * math.pi)
+        if res < 0.0:
+            res += 2 * math.pi
+        return res
+
+    def build_graph(self, gcurves):
+        graph = {}
+        for direct in gcurves:
+            inverse = self.invert_gcurve(direct)
+            for gcurve, gcurve2 in [(direct, inverse), (inverse, direct)]:
+                orig = gcurve[1]
+                dest = gcurve[2]
+                for point in graph:
+                    if abs(complex(*point) - complex(*orig)) <= CONTINUITY_TOLERANCE:
+                        break
+                else:
+                    point = orig
+                    graph[point] = []
+                for point2 in graph:
+                    if abs(complex(*point2) - complex(*dest)) <= CONTINUITY_TOLERANCE:
+                        break
+                else:
+                    point2 = dest
+                    graph[point2] = []
+                graph[point].append((self.compute_gcurve_tangent(gcurve),
+                                     [point2, self.compute_gcurve_tangent(gcurve2),
+                                      gcurve, gcurve2,
+                                      False]))
+        for point in graph:
+            graph[point].sort()
+        return graph
+
+    def walk_cell(self, graph, edge):
+        if edge[4]:
+            return [], 0.0
+        edge[4] = True
+        point = edge[0]
+        angle = edge[1]
+        new_edges = [x for x in graph[point] if x[0] > angle]
+        if len(new_edges) > 0:
+            new_edge = new_edges[0]
+        else:
+            new_edge = graph[point][0]
+        new_angle = new_edge[0]
+        rot = angle - new_angle
+        rot %= 2 * math.pi
+        if rot < 0.0:
+            rot += 2 * math.pi
+        rot -= math.pi
+        prev_cell, prev_rot = self.walk_cell(graph, new_edge[1])
+        prev_cell.append(point)
+        return prev_cell, prev_rot + rot
+
+    def build_cells(self, graph):
+        cells = []
+        for point, edges in graph.iteritems():
+            for edge in edges:
+                cell = self.walk_cell(graph, edge[1])
+                if cell[0] != []:
+                    cells.append(cell)
+        return cells
+
+    def sorted_gcurves(self, gcurves):
+        graph = self.build_graph(gcurves)
+        cells = self.build_cells(graph)
+        inkex.errormsg(repr(cells))
+        return gcurves
 
     def generate_gcode(self, gcurves, params):
         current = None
@@ -328,14 +415,22 @@ class GioLaser(inkex.Effect):
             code = curve[0]
             if code == 'line':
                 assert len(curve) == 3
-                if current is None or abs(complex(*current) - complex(*curve[1])) > CONTINUITY_TOLERANCE:
+                orig = curve[1]
+                dest = curve[2]
+                if current is None or abs(complex(*current) - complex(*orig)) > CONTINUITY_TOLERANCE:
                     self.board.laser_off()
-                    self.board.rapid_move(curve[1][0], curve[1][1], params['move-feed'])
+                    self.board.rapid_move(orig[0], orig[1], params['move-feed'])
                     self.board.laser_on(params['laser'])
-                self.board.move(curve[2][0], curve[2][1], params['feed'])
-                current = tuple(curve[2])
-            else:
+                self.board.move(dest[0], dest[1], params['feed'])
+                current = tuple(dest)
+            elif code in ['cw_arc', 'ccw_arc']:
+                assert len(curve) == 4
+                orig = curve[1]
+                dest = curve[2]
+                center = curve[3]
                 raise NotImplementedError()
+            else:
+                raise Exception("Should not arrive here")
 
     def process_layer(self, layer):
         # If the layer's label begins with "#", then we ignore it
@@ -376,7 +471,7 @@ class GioLaser(inkex.Effect):
 
         # Decide best order to draw
         if self.options.draw_order in ['inside_first', 'outside_first']:
-            self.sort_gcurves(gcurves)
+            gcurves = self.sorted_gcurves(gcurves)
             if self.options.draw_order == 'inside_first':
                 gcurves.reverse()
 
