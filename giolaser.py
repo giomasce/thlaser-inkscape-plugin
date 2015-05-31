@@ -5,6 +5,8 @@ import math
 import cmath
 import pprint
 import collections
+import Queue
+import itertools
 
 # Inkscape imports
 import inkex
@@ -329,7 +331,7 @@ class GioLaser(inkex.Effect):
         elif code == 'ccw_arc':
             return ('cw_arc', gcurve[2], gcurve[1], gcurve[3])
         else:
-            return Exception("Should not arrive here")
+            raise Exception("Should not arrive here, code = %s" % (code))
 
     def compute_gcurve_tangent(self, gcurve):
         code = gcurve[0]
@@ -340,7 +342,7 @@ class GioLaser(inkex.Effect):
         elif code == 'ccw_arc':
             res = cmath.phase(complex(*gcurve[3]) - complex(*gcurve[1])) - 0.5 * math.pi
         else:
-            return Exception("Should not arrive here")
+            raise Exception("Should not arrive here, code = %s" % (code))
         res = res % (2 * math.pi)
         if res < 0.0:
             res += 2 * math.pi
@@ -370,6 +372,7 @@ class GioLaser(inkex.Effect):
                                       gcurve, gcurve2,
                                       False]))
         for point in graph:
+            assert len(graph[point]) == len(set(x[0] for x in graph[point]))
             graph[point].sort()
         return graph
 
@@ -391,23 +394,82 @@ class GioLaser(inkex.Effect):
             rot += 2 * math.pi
         rot -= math.pi
         prev_cell, prev_rot = self.walk_cell(graph, new_edge[1])
-        prev_cell.append(point)
+        prev_cell.append((edge[2], edge[3]))
         return prev_cell, prev_rot + rot
 
     def build_cells(self, graph):
         cells = []
+        rev_cells = {}
         for point, edges in graph.iteritems():
             for edge in edges:
                 cell = self.walk_cell(graph, edge[1])
                 if cell[0] != []:
-                    cells.append(cell)
-        return cells
+                    assert abs(cell[1]) - 2 * math.pi <= 0.001, cell[1]
+                    cell_list = cell[0]
+                    cell_list.reverse()
+                    cells.append([cell_list, cell[1], None])
+                    for direct, _ in cell_list:
+                        rev_cells[direct] = cells[-1]
+        return cells, rev_cells
+
+    def compute_cell_distance(self, main_cell, rev_cells):
+        queue = Queue.Queue()
+        queue.put((main_cell, 0))
+        while True:
+            try:
+                cell, dist = queue.get(block=False)
+            except Queue.Empty:
+                break
+            if cell[2] is not None:
+                continue
+            cell[2] = dist
+            for edge in cell[0]:
+                new_cell = rev_cells[edge[1]]
+                queue.put((new_cell, dist + 1))
+
+    # FIXME: highly optimizable!
+    def optimize_gcurves(self, gcurves, pos):
+        new_gcurves = []
+        while len(gcurves) > 0:
+            for_min = [(abs(complex(*gcurve[1]) - complex(*pos)), gcurve, gcurve) for gcurve in gcurves]
+            for_min += [(abs(complex(*gcurve[2]) - complex(*pos)), self.invert_gcurve(gcurve), gcurve) for gcurve in gcurves]
+            min_el = min(for_min)
+            gcurves.remove(min_el[2])
+            pos = min_el[2][2]
+            new_gcurves.append(min_el[1])
+        return new_gcurves, pos
 
     def sorted_gcurves(self, gcurves):
         graph = self.build_graph(gcurves)
-        cells = self.build_cells(graph)
-        inkex.errormsg(repr(cells))
-        return gcurves
+        cells, rev_cells = self.build_cells(graph)
+        [main_cell] = [cell for cell in cells if cell[1] < 0.0]
+        self.compute_cell_distance(main_cell, rev_cells)
+        assert all(x[2] is not None for x in cells)
+        max_depth = max(x[2] for x in cells)
+        boundary = [[] for _ in xrange(max_depth)]
+        internal = [[] for _ in xrange(max_depth)]
+        for direct in gcurves:
+            reverse = self.invert_gcurve(direct)
+            dir_depth = rev_cells[direct][2]
+            rev_depth = rev_cells[reverse][2]
+            min_depth = min(dir_depth, rev_depth)
+            max_depth = max(dir_depth, rev_depth)
+            if min_depth == max_depth:
+                internal[min_depth - 1].append(direct)
+            else:
+                boundary[min_depth].append(direct)
+        #inkex.errormsg(pprint.pformat(cells))
+        #inkex.errormsg(repr(rev_cells))
+        #inkex.errormsg(pprint.pformat((boundary, internal)))
+        pos = (0.0, 0.0)
+        new_gcurves, pos = self.optimize_gcurves(list(itertools.chain(*internal)), pos)
+        for gcurve in new_gcurves:
+            yield gcurve
+        boundary.reverse()
+        for bucket in boundary:
+            new_gcurves, pos = self.optimize_gcurves(bucket, pos)
+            for gcurve in new_gcurves:
+                yield gcurve
 
     def generate_gcode(self, gcurves, params):
         current = None
@@ -471,8 +533,8 @@ class GioLaser(inkex.Effect):
 
         # Decide best order to draw
         if self.options.draw_order in ['inside_first', 'outside_first']:
-            gcurves = self.sorted_gcurves(gcurves)
-            if self.options.draw_order == 'inside_first':
+            gcurves = list(self.sorted_gcurves(gcurves))
+            if self.options.draw_order == 'outside_first':
                 gcurves.reverse()
 
         # Actually draw
