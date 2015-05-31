@@ -38,6 +38,7 @@ class GioRumba:
     def __init__(self, foutput):
         self.foutput = foutput
         self.time = 0.0
+        self.cutting_time = 0.0
         self.position = (0.0, 0.0)
 
     def write_header(self):
@@ -69,6 +70,7 @@ class GioRumba:
     def move(self, x, y, f):
         self.foutput.write("G1 X%f Y%f F%f\n" % (x, y, f))
         self.time += abs(complex(*self.position) - complex(x, y)) / f
+        self.cutting_time += abs(complex(*self.position) - complex(x, y)) / f
         self.position = (x, y)
 
     def cw_arc(self, x, y, i, j, f):
@@ -83,7 +85,7 @@ class GioRumba:
         self.foutput.write(''.join(['; ' + x + '\n' for x in comment.splitlines()]))
 
     def get_time(self):
-        return self.time
+        return self.time, self.cutting_time
 
 BOARDS = {
     'gio_rumba': GioRumba,
@@ -241,9 +243,11 @@ class GioLaser(inkex.Effect):
         if self.options.home_after:
             self.board.move(0.0, 0.0, self.options.move_feed)
 
-        time = self.board.get_time()
+        time, cutting_time = self.board.get_time()
         if time is not None:
             self.board.write_comment('Total time elapsed: %f minutes (not including initial and final homing)' % (time))
+        if cutting_time is not None:
+            self.board.write_comment('Real cutting time: %f minutes' % (cutting_time))
 
         self.board.write_footer()
 
@@ -435,15 +439,16 @@ class GioLaser(inkex.Effect):
             for_min += [(abs(complex(*gcurve[2]) - complex(*pos)), self.invert_gcurve(gcurve), gcurve) for gcurve in gcurves]
             min_el = min(for_min)
             gcurves.remove(min_el[2])
-            pos = min_el[2][2]
+            pos = min_el[1][2]
             new_gcurves.append(min_el[1])
         return new_gcurves, pos
 
     def sorted_gcurves(self, gcurves):
         graph = self.build_graph(gcurves)
         cells, rev_cells = self.build_cells(graph)
-        [main_cell] = [cell for cell in cells if cell[1] < 0.0]
-        self.compute_cell_distance(main_cell, rev_cells)
+        main_cells = [cell for cell in cells if cell[1] < 0.0]
+        for main_cell in main_cells:
+            self.compute_cell_distance(main_cell, rev_cells)
         assert all(x[2] is not None for x in cells)
         max_depth = max(x[2] for x in cells)
         boundary = [[] for _ in xrange(max_depth)]
@@ -512,7 +517,6 @@ class GioLaser(inkex.Effect):
             params = dict([x.split('=', 1) for x in params_str.split(',')])
 
         self.board.write_comment("Layer %s" % (name))
-        self.board.write_comment(pprint.pformat(params))
 
         # Interpret some well-known parameters
         params['feed'] = float(params['feed']) if 'feed' in params else self.options.feed
@@ -526,8 +530,8 @@ class GioLaser(inkex.Effect):
         gcurves = []
         for path in self.list_deep_paths(layer, trans):
             #self.board.write_comment('\nPath with id: %s\n\n' % (path.id))
-            self.board.write_comment(pprint.pformat(path.transform))
-            self.board.write_comment(pprint.pformat(path.data))
+            #self.board.write_comment(pprint.pformat(path.transform))
+            #self.board.write_comment(pprint.pformat(path.data))
             gcurves += self.generate_gcurves(path)
         #self.board.write_comment(pprint.pformat(gcurves))
 
