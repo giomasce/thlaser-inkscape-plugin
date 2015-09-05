@@ -524,7 +524,7 @@ class GioLaser(inkex.Effect):
         params['laser'] = float(params['laser']) if 'laser' in params else self.options.laser
 
         # Setup a transform to account for measure units (mm or inch)
-        trans = [[self.unit_scale, 0.0, 0.0], [0.0, self.unit_scale, 0.0]]
+        trans = [[self.unit_scale * self.options.xscale, 0.0, self.options.xoffset], [0.0, self.unit_scale * self.options.yscale, self.options.yoffset]]
 
         # Retrieve the list of the paths to draw
         gcurves = []
