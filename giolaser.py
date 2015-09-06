@@ -19,7 +19,7 @@ import bezmisc
 # http://wiki.inkscape.org/wiki/index.php/Units_In_Inkscape)
 DEFAULT_DPI = 90.0
 
-CONTINUITY_TOLERANCE = 0.001
+CONTINUITY_TOLERANCE = 0.01
 
 SVG_GROUP_TAG = inkex.addNS("g", "svg")
 SVG_PATH_TAG = inkex.addNS('path','svg')
