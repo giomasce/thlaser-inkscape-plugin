@@ -95,21 +95,23 @@ def scalar(c1, c2):
     return (c1 * c2.conjugate()).real
 
 def cross(c1, c2):
-    return (c1 * c2.conjugare()).imag
+    return (c1 * c2.conjugate()).imag
+
+def cpx_to_tup(c):
+    return (c.real, c.imag)
 
 def simple_biarc(p1, t1, p2, t2):
     """Compute the biarc interpolation between two points.
 
+    Input and output points are taken as complex numbers.
+
     Use the algorithm in
     http://www.ryanjuckett.com/programming/biarc-interpolation/
-    """
-    p1 = complex(*p1)
-    p2 = complex(*p2)
-    t1 = complex(*t1)
-    t1 /= abs(t1)
-    t2 = complex(*t2)
-    t2 /= abs(t2)
 
+    """
+    # Normalize tangents and compute useful values
+    t1 /= abs(t1)
+    t2 /= abs(t2)
     v = p2 - p1
     t = t1 + t2
 
@@ -122,7 +124,7 @@ def simple_biarc(p1, t1, p2, t2):
         # Case 1
         d = (discr ** 0.5 - sc_vt) / (2 * (1 - sc_tt))
     else:
-        sc_vt2 = scal(v, t2)
+        sc_vt2 = scalar(v, t2)
         if sc_vt2 != 0.0:
             # Case 2
             d = sc_vv / (4 * sc_vt2)
@@ -138,14 +140,14 @@ def simple_biarc(p1, t1, p2, t2):
     # Compute the centers and radii (as in "Finding the Center")
     n1 = 1j * t1
     n2 = 1j * t2
-    s1 = 0.5 * scal(pm - p1, pm - p1) / scal(n1, pm - p1)
-    s2 = 0.5 * scal(pm - p2, pm - p2) / scal(n2, pm - p2)
+    s1 = 0.5 * scalar(pm - p1, pm - p1) / scalar(n1, pm - p1)
+    s2 = 0.5 * scalar(pm - p2, pm - p2) / scalar(n2, pm - p2)
     c1 = p1 + s1 * n1
     c2 = p2 + s2 * n2
-    r1 = abs(s1)
-    r2 = abs(s2)
+    #r1 = abs(s1)
+    #r2 = abs(s2)
 
-    # TODO
+    return c1, pm, c2
 
 class GioLaser(inkex.Effect):
 
@@ -286,8 +288,18 @@ class GioLaser(inkex.Effect):
         to current transformation.
 
         """
-        # STUB
-        gcurves.append(('line', old, new))
+        old = complex(*old)
+        first = complex(*first)
+        second = complex(*second)
+        new = complex(*new)
+        t1 = first - old
+        t2 = second - new
+        c1, pm, c2 = simple_biarc(old, t1, new, t2)
+
+        # Simple biarc interpolation
+        #gcurves.append(('line', old, new))
+        gcurves.append(('cw_arc' if cross(old-c1, t1) < 0 else 'ccw_arc', cpx_to_tup(old), cpx_to_tup(pm), cpx_to_tup(c1)))
+        gcurves.append(('ccw_arc' if cross(new-c2, t2) < 0 else 'cw_arc', cpx_to_tup(pm), cpx_to_tup(new), cpx_to_tup(c2)))
 
     def generate_gcurves(self, path):
         gcurves = []
