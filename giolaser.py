@@ -118,12 +118,36 @@ def simple_biarc(p1, t1, p2, t2):
     http://www.ryanjuckett.com/programming/biarc-interpolation/
 
     """
-    # Normalize tangents and compute useful values
-    t1 /= abs(t1)
-    t2 /= abs(t2)
     #inkex.errormsg(str((p1, t1, p2, t2)))
+    # Normalize tangents and compute useful values
+    t1_zero = False
+    t2_zero = False
+    try:
+        t1 /= abs(t1)
+    except ZeroDivisionError:
+        t1_zero = True
+    try:
+        t2 /= abs(t2)
+    except ZeroDivisionError:
+        t2_zero = True
     v = p2 - p1
     t = t1 + t2
+
+    # Handle degenerate cases: when both derivatives are zero, do
+    # linear interpolation; when just one is zero, ignore it and do a
+    # simple arc interpolation using the other one
+    if t1_zero and t2_zero:
+        return None, None, None
+    if t1_zero or t2_zero:
+        if t1_zero:
+            n = t2 * 1j
+        else:
+            n = t1 * 1j
+        k = 0.5 * abs(p1 - p2) ** 2 / scalar(p2 - p1, n)
+        if t1_zero:
+            return None, p1, p2 + k * n
+        else:
+            return p1 + k * n, p2, None
 
     # Compute d, set as d = d2 = d1 (as in "Choosing d1")
     sc_vt = scalar(v, t)
@@ -355,7 +379,6 @@ class GioLaser(inkex.Effect):
         new = complex(*new)
         t1 = first - old
         t2 = new - second
-        #c1, pm, c2 = simple_biarc(old, t1, new, t2)
         biarcs = recursive_biarc([old, first, second, new],
                                  self.options.biarc_tolerance,
                                  self.options.biarc_max_split_depth)
@@ -363,12 +386,16 @@ class GioLaser(inkex.Effect):
         # Test straight line approximation
         #gcurves.append(('line', self.snap_to_grid(cpx_to_tup(old)), self.snap_to_grid(cpx_to_tup(new))))
 
-        # Simple biarc interpolation
+        # Write curves
         for p1, c1, tg1, pm, c2, tg2, p2 in biarcs:
-            gcurves.append(('ccw_arc' if cross(p1 - c1, tg1) > 0 else 'cw_arc',
-                            self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(pm)), cpx_to_tup(c1)))
-            gcurves.append(('ccw_arc' if cross(p2 - c2, tg2) > 0 else 'cw_arc',
-                            self.snap_to_grid(cpx_to_tup(pm)), self.snap_to_grid(cpx_to_tup(p2)), cpx_to_tup(c2)))
+            if c1 is not None:
+                gcurves.append(('ccw_arc' if cross(p1 - c1, tg1) > 0 else 'cw_arc',
+                                self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(pm)), cpx_to_tup(c1)))
+            if c2 is not None:
+                gcurves.append(('ccw_arc' if cross(p2 - c2, tg2) > 0 else 'cw_arc',
+                                self.snap_to_grid(cpx_to_tup(pm)), self.snap_to_grid(cpx_to_tup(p2)), cpx_to_tup(c2)))
+            if pm is None:
+                gcurves.append(('line', self.snap_to_grid(p1), self.snap_to_grid(p2)))
 
     def generate_gcurves(self, path):
         gcurves = []
