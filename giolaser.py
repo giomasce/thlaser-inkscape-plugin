@@ -7,6 +7,7 @@ import pprint
 import collections
 import Queue
 import itertools
+import copy
 
 # Inkscape imports
 import inkex
@@ -95,10 +96,18 @@ def scalar(c1, c2):
     return (c1 * c2.conjugate()).real
 
 def cross(c1, c2):
-    return (c1 * c2.conjugate()).imag
+    return -(c1 * c2.conjugate()).imag
 
 def cpx_to_tup(c):
     return (c.real, c.imag)
+
+def evaluate_casteljau(bezier, t):
+    t2 = 1.0 - t
+    bezier = copy.deepcopy(bezier)
+    for i in xrange(len(bezier) - 1, 0, -1):
+        for j in xrange(i):
+            bezier[j] = t2 * bezier[j] + t * bezier[j+1]
+    return bezier[0]
 
 def simple_biarc(p1, t1, p2, t2):
     """Compute the biarc interpolation between two points.
@@ -112,6 +121,7 @@ def simple_biarc(p1, t1, p2, t2):
     # Normalize tangents and compute useful values
     t1 /= abs(t1)
     t2 /= abs(t2)
+    #inkex.errormsg(str((p1, t1, p2, t2)))
     v = p2 - p1
     t = t1 + t2
 
@@ -125,6 +135,7 @@ def simple_biarc(p1, t1, p2, t2):
         d = (discr ** 0.5 - sc_vt) / (2 * (1 - sc_tt))
     else:
         sc_vt2 = scalar(v, t2)
+        sc_vv = scalar(v, v)
         if sc_vt2 != 0.0:
             # Case 2
             d = sc_vv / (4 * sc_vt2)
@@ -134,7 +145,7 @@ def simple_biarc(p1, t1, p2, t2):
 
     # Compute pm (as in "Finding the Connection")
     q1 = p1 + d * t1
-    q2 = p2 + d * t2
+    q2 = p2 - d * t2
     pm = 0.5 * (q1 + q2)
 
     # Compute the centers and radii (as in "Finding the Center")
@@ -148,6 +159,51 @@ def simple_biarc(p1, t1, p2, t2):
     #r2 = abs(s2)
 
     return c1, pm, c2
+
+def recursive_biarc(cubic, tolerance, niter, derivative=None, t1=None, t2=None):
+    # Checks and initialization
+    assert len(cubic) == 4
+
+    # As per http://www.cs.mtu.edu/~shene/COURSES/cs3621/NOTES/spline/Bezier/bezier-der.html
+    if derivative is None:
+        derivative = [3 * (cubic[1] - cubic[0]),
+                      3 * (cubic[2] - cubic[1]),
+                      3 * (cubic[3] - cubic[2])]
+    if t1 is None:
+        t1 = 0.0
+        t2 = 1.0
+
+    # Compute simple biarc
+    p1 = evaluate_casteljau(cubic, t1)
+    p2 = evaluate_casteljau(cubic, t2)
+    tg1 = evaluate_casteljau(derivative, t1)
+    tg2 = evaluate_casteljau(derivative, t2)
+    c1, pm, c2 = simple_biarc(p1, tg1, p2, tg2)
+
+    # Decide if precision is enough (TODO: the algorithm has large
+    # space for enhancement)
+    if niter == 0:
+        stop = True
+    else:
+        tgm = evaluate_casteljau(derivative, 0.5 * (t1 + t2))
+        if tg2 != tg1:
+            error = abs(tgm - 0.5 * (tg1 + tg2)) / abs(tg2 - tg1)
+            #inkex.errormsg(str(error))
+            stop = error < tolerance
+        else:
+            stop = False
+
+    # If precision is enough or maximum iteration number has been
+    # reached, return computed biarc
+    if stop:
+        yield (p1, c1, tg1, pm, c2, tg2, p2)
+
+    # Otherwise make recursive call
+    else:
+        for ret in recursive_biarc(cubic, tolerance, niter - 1, derivative, t1, 0.5 * (t1 + t2)):
+            yield ret
+        for ret in recursive_biarc(cubic, tolerance, niter - 1, derivative, 0.5 * (t1 + t2), t2):
+            yield ret
 
 class GioLaser(inkex.Effect):
 
@@ -200,7 +256,7 @@ class GioLaser(inkex.Effect):
 
         # Tolerances and approximations
         self.OptionParser.add_option("",   "--biarc-tolerance",
-                                     action="store", type="float", dest="biarc_tolerance", default="1",
+                                     action="store", type="float", dest="biarc_tolerance", default="0.1",
                                      help="Tolerance used when calculating biarc interpolation.")
         self.OptionParser.add_option("",   "--biarc-max-split-depth",
                                      action="store", type="int", dest="biarc_max_split_depth", default="4",
@@ -281,6 +337,11 @@ class GioLaser(inkex.Effect):
         else:
             inkex.errormsg("Cannot parse node with tag %s" % (node.tag))
 
+    def snap_to_grid(self, p):
+        def snap(x):
+            return round(x / CONTINUITY_TOLERANCE) * CONTINUITY_TOLERANCE
+        return (snap(p[0]), snap(p[1]))
+
     def generate_gcurves_cubic(self, gcurves, old, first, second, new):
         """Compute the recursive biarc interpolation that describes a cubic curve.
 
@@ -293,13 +354,21 @@ class GioLaser(inkex.Effect):
         second = complex(*second)
         new = complex(*new)
         t1 = first - old
-        t2 = second - new
-        c1, pm, c2 = simple_biarc(old, t1, new, t2)
+        t2 = new - second
+        #c1, pm, c2 = simple_biarc(old, t1, new, t2)
+        biarcs = recursive_biarc([old, first, second, new],
+                                 self.options.biarc_tolerance,
+                                 self.options.biarc_max_split_depth)
+
+        # Test straight line approximation
+        #gcurves.append(('line', self.snap_to_grid(cpx_to_tup(old)), self.snap_to_grid(cpx_to_tup(new))))
 
         # Simple biarc interpolation
-        #gcurves.append(('line', old, new))
-        gcurves.append(('cw_arc' if cross(old-c1, t1) < 0 else 'ccw_arc', cpx_to_tup(old), cpx_to_tup(pm), cpx_to_tup(c1)))
-        gcurves.append(('ccw_arc' if cross(new-c2, t2) < 0 else 'cw_arc', cpx_to_tup(pm), cpx_to_tup(new), cpx_to_tup(c2)))
+        for p1, c1, tg1, pm, c2, tg2, p2 in biarcs:
+            gcurves.append(('ccw_arc' if cross(p1 - c1, tg1) > 0 else 'cw_arc',
+                            self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(pm)), cpx_to_tup(c1)))
+            gcurves.append(('ccw_arc' if cross(p2 - c2, tg2) > 0 else 'cw_arc',
+                            self.snap_to_grid(cpx_to_tup(pm)), self.snap_to_grid(cpx_to_tup(p2)), cpx_to_tup(c2)))
 
     def generate_gcurves(self, path):
         gcurves = []
@@ -309,6 +378,7 @@ class GioLaser(inkex.Effect):
                     mat[1][0] * p[0] + mat[1][1] * p[1] + mat[1][2])
         current = (0.0, 0.0)
         beginning = None
+        #inkex.errormsg("path data: %s" % (path.data))
         for op in path.data:
             assert len(op) == 2
             code = op[0]
@@ -319,11 +389,11 @@ class GioLaser(inkex.Effect):
             elif code == 'L':
                 assert len(op[1]) == 2
                 new = tuple(op[1])
-                gcurves.append(('line', trans(current), trans(new)))
+                gcurves.append(('line', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(new))))
                 current = new
             elif code == 'Z':
                 assert len(op[1]) == 0
-                gcurves.append(('line', trans(current), trans(beginning)))
+                gcurves.append(('line', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(beginning))))
                 current = beginning
             elif code == 'C':
                 assert len(op[1]) == 6
@@ -336,7 +406,22 @@ class GioLaser(inkex.Effect):
             else:
                 inkex.errormsg("Code %s not supported (so far...)" % (code))
                 break
+        gcurves = [gcurve for gcurve in gcurves if self.gcurve_len(gcurve) > 0]
+        #inkex.errormsg("gcurves:\n%s" % (pprint.pformat(gcurves)))
         return gcurves
+
+    def gcurve_len(self, gcurve):
+        code = gcurve[0]
+        if code == 'line':
+            return abs(complex(*gcurve[1]) - complex(*gcurve[2]))
+        elif code == 'cw_arc':
+            # FIXME: this code is wrong (doesn't consider the angle)
+            return math.pi * abs(complex(*gcurve[1]) - complex(*gcurve[3]))
+        elif code == 'ccw_arc':
+            # FIXME: this code is wrong (doesn't consider the angle)
+            return math.pi * abs(complex(*gcurve[1]) - complex(*gcurve[3]))
+        else:
+            raise Exception("Should not arrive here, code = %s" % (code))
 
     def invert_gcurve(self, gcurve):
         code = gcurve[0]
@@ -350,13 +435,18 @@ class GioLaser(inkex.Effect):
             raise Exception("Should not arrive here, code = %s" % (code))
 
     def compute_gcurve_tangent(self, gcurve):
+        def phase(x):
+            if abs(x) == 0.0:
+                raise ValueError("Cannot compute phase of 0.0")
+            else:
+                return cmath.phase(x)
         code = gcurve[0]
         if code == 'line':
-            res = cmath.phase(complex(*gcurve[2]) - complex(*gcurve[1]))
+            res = phase(complex(*gcurve[2]) - complex(*gcurve[1]))
         elif code == 'cw_arc':
-            res = cmath.phase(complex(*gcurve[3]) - complex(*gcurve[1])) + 0.5 * math.pi
+            res = phase(complex(*gcurve[3]) - complex(*gcurve[1])) + 0.5 * math.pi
         elif code == 'ccw_arc':
-            res = cmath.phase(complex(*gcurve[3]) - complex(*gcurve[1])) - 0.5 * math.pi
+            res = phase(complex(*gcurve[3]) - complex(*gcurve[1])) - 0.5 * math.pi
         else:
             raise Exception("Should not arrive here, code = %s" % (code))
         res = res % (2 * math.pi)
@@ -388,7 +478,7 @@ class GioLaser(inkex.Effect):
                                       gcurve, gcurve2,
                                       False]))
         for point in graph:
-            assert len(graph[point]) == len(set(x[0] for x in graph[point]))
+            assert len(graph[point]) == len(set(x[0] for x in graph[point])), pprint.pformat(graph[point])
             graph[point].sort()
         return graph
 
@@ -456,6 +546,7 @@ class GioLaser(inkex.Effect):
         return new_gcurves, pos
 
     def sorted_gcurves(self, gcurves):
+        #inkex.errormsg("initial gcurves:\n%s" % (pprint.pformat(gcurves)))
         graph = self.build_graph(gcurves)
         cells, rev_cells = self.build_cells(graph)
         main_cells = [cell for cell in cells if cell[1] < 0.0]
@@ -480,11 +571,13 @@ class GioLaser(inkex.Effect):
         #inkex.errormsg(pprint.pformat((boundary, internal)))
         pos = (0.0, 0.0)
         new_gcurves, pos = self.optimize_gcurves(list(itertools.chain(*internal)), pos)
+        #inkex.errormsg("internal gcurves:\n%s" % (pprint.pformat(new_gcurves)))
         for gcurve in new_gcurves:
             yield gcurve
         boundary.reverse()
         for bucket in boundary:
             new_gcurves, pos = self.optimize_gcurves(bucket, pos)
+            #inkex.errormsg("boundary gcurves:\n%s" % (pprint.pformat(new_gcurves)))
             for gcurve in new_gcurves:
                 yield gcurve
 
@@ -492,24 +585,26 @@ class GioLaser(inkex.Effect):
         current = None
         for curve in gcurves:
             code = curve[0]
+            orig = curve[1]
+            dest = curve[2]
+            if current is None or abs(complex(*current) - complex(*orig)) > CONTINUITY_TOLERANCE:
+                self.board.laser_off()
+                self.board.rapid_move(orig[0], orig[1], params['move-feed'])
+                self.board.laser_on(params['laser'])
             if code == 'line':
                 assert len(curve) == 3
-                orig = curve[1]
-                dest = curve[2]
-                if current is None or abs(complex(*current) - complex(*orig)) > CONTINUITY_TOLERANCE:
-                    self.board.laser_off()
-                    self.board.rapid_move(orig[0], orig[1], params['move-feed'])
-                    self.board.laser_on(params['laser'])
                 self.board.move(dest[0], dest[1], params['feed'])
-                current = tuple(dest)
-            elif code in ['cw_arc', 'ccw_arc']:
+            elif code == 'cw_arc':
                 assert len(curve) == 4
-                orig = curve[1]
-                dest = curve[2]
                 center = curve[3]
-                raise NotImplementedError()
+                self.board.cw_arc(dest[0], dest[1], center[0] - orig[0], center[1] - orig[1], params['feed'])
+            elif code == 'ccw_arc':
+                assert len(curve) == 4
+                center = curve[3]
+                self.board.ccw_arc(dest[0], dest[1], center[0] - orig[0], center[1] - orig[1], params['feed'])
             else:
                 raise Exception("Should not arrive here")
+            current = tuple(dest)
 
     def process_layer(self, layer):
         # If the layer's label begins with "#", then we ignore it
@@ -536,7 +631,8 @@ class GioLaser(inkex.Effect):
         params['laser'] = float(params['laser']) if 'laser' in params else self.options.laser
 
         # Setup a transform to account for measure units (mm or inch)
-        trans = [[self.unit_scale * self.options.xscale, 0.0, self.options.xoffset], [0.0, self.unit_scale * self.options.yscale, self.options.yoffset]]
+        trans = [[self.unit_scale * self.options.xscale, 0.0, self.options.xoffset],
+                 [0.0, self.unit_scale * self.options.yscale, self.options.yoffset]]
 
         # Retrieve the list of the paths to draw
         gcurves = []
