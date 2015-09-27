@@ -143,11 +143,21 @@ def simple_biarc(p1, t1, p2, t2):
             n = t2 * 1j
         else:
             n = t1 * 1j
-        k = 0.5 * abs(p1 - p2) ** 2 / scalar(p2 - p1, n)
+        #inkex.errormsg("v = %s, n = %s, scalar = %s" % (v, n, scalar(v, n)))
+        try:
+            k = 0.5 * abs(p1 - p2) ** 2 / scalar(v, n)
+        except ZeroDivisionError:
+            return None, None, None
         if t1_zero:
-            return None, p1, p2 + k * n
+            c2 = p2 + k * n
+            if abs(c2) >= 10000.0:
+                raise Exception("Bad things happening")
+            return None, p1, c2
         else:
-            return p1 + k * n, p2, None
+            c1 = p1 + k * n
+            if abs(c1) >= 10000.0:
+                raise Exception("Bad things happening")
+            return c1, p2, None
 
     # Compute d, set as d = d2 = d1 (as in "Choosing d1")
     sc_vt = scalar(v, t)
@@ -165,7 +175,10 @@ def simple_biarc(p1, t1, p2, t2):
             d = sc_vv / (4 * sc_vt2)
         else:
             # Case 3
-            raise NotImplementedError()
+            pm = p1 + 0.5 * v
+            c1 = p1 + 0.25 * v
+            c2 = p1 + 0.75 * v
+            return c1, pm, c2
 
     # Compute pm (as in "Finding the Connection")
     q1 = p1 + d * t1
@@ -175,12 +188,22 @@ def simple_biarc(p1, t1, p2, t2):
     # Compute the centers and radii (as in "Finding the Center")
     n1 = 1j * t1
     n2 = 1j * t2
-    s1 = 0.5 * scalar(pm - p1, pm - p1) / scalar(n1, pm - p1)
-    s2 = 0.5 * scalar(pm - p2, pm - p2) / scalar(n2, pm - p2)
-    c1 = p1 + s1 * n1
-    c2 = p2 + s2 * n2
-    #r1 = abs(s1)
-    #r2 = abs(s2)
+    try:
+        s1 = 0.5 * scalar(pm - p1, pm - p1) / scalar(n1, pm - p1)
+    except ZeroDivisionError:
+        c1 = None
+    else:
+        c1 = p1 + s1 * n1
+        if abs(c1) >= 1000.0:
+            c1 = None
+    try:
+        s2 = 0.5 * scalar(pm - p2, pm - p2) / scalar(n2, pm - p2)
+    except ZeroDivisionError:
+        c2 = None
+    else:
+        c2 = p2 + s2 * n2
+        if abs(c2) >= 1000.0:
+            c2 = None
 
     return c1, pm, c2
 
@@ -201,6 +224,8 @@ def recursive_biarc(cubic, tolerance, niter, derivative=None, t1=None, t2=None):
     p1 = evaluate_casteljau(cubic, t1)
     p2 = evaluate_casteljau(cubic, t2)
     tg1 = evaluate_casteljau(derivative, t1)
+    #if p1 == p2:
+    #    inkex.errormsg(repr(cubic))
     tg2 = evaluate_casteljau(derivative, t2)
     c1, pm, c2 = simple_biarc(p1, tg1, p2, tg2)
 
@@ -228,6 +253,25 @@ def recursive_biarc(cubic, tolerance, niter, derivative=None, t1=None, t2=None):
             yield ret
         for ret in recursive_biarc(cubic, tolerance, niter - 1, derivative, 0.5 * (t1 + t2), t2):
             yield ret
+
+def gcurve_len(gcurve):
+    code = gcurve[0]
+    if code == 'line':
+        return abs(complex(*gcurve[1]) - complex(*gcurve[2]))
+    elif code in ['cw_arc', 'ccw_arc']:
+        first = complex(*gcurve[1])
+        second = complex(*gcurve[2])
+        center = complex(*gcurve[3])
+        angle = cmath.phase((first - center) / (second - center))
+        if angle < 0.0:
+            angle += 2 * math.pi
+        assert 0.0 <= angle < 2 * math.pi
+        if code == 'ccw_arc':
+            return angle * abs(first - center)
+        else:
+            return (2 * math.pi - angle) * abs(first - center)
+    else:
+        raise Exception("Should not arrive here, code = %s" % (code))
 
 class GioLaser(inkex.Effect):
 
@@ -366,6 +410,11 @@ class GioLaser(inkex.Effect):
             return round(x / CONTINUITY_TOLERANCE) * CONTINUITY_TOLERANCE
         return (snap(p[0]), snap(p[1]))
 
+    def add_gcurve(self, gcurves, gcurve):
+        if gcurve_len(gcurve) > 10000.0:
+            raise Exception("Bad gcurve: %r" % (gcurve,))
+        gcurves.append(gcurve)
+
     def generate_gcurves_cubic(self, gcurves, old, first, second, new):
         """Compute the recursive biarc interpolation that describes a cubic curve.
 
@@ -389,13 +438,13 @@ class GioLaser(inkex.Effect):
         # Write curves
         for p1, c1, tg1, pm, c2, tg2, p2 in biarcs:
             if c1 is not None:
-                gcurves.append(('ccw_arc' if cross(p1 - c1, tg1) > 0 else 'cw_arc',
-                                self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(pm)), cpx_to_tup(c1)))
+                self.add_gcurve(gcurves, ('ccw_arc' if cross(p1 - c1, tg1) > 0 else 'cw_arc',
+                                          self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(pm)), cpx_to_tup(c1)))
             if c2 is not None:
-                gcurves.append(('ccw_arc' if cross(p2 - c2, tg2) > 0 else 'cw_arc',
-                                self.snap_to_grid(cpx_to_tup(pm)), self.snap_to_grid(cpx_to_tup(p2)), cpx_to_tup(c2)))
+                self.add_gcurve(gcurves, ('ccw_arc' if cross(p2 - c2, tg2) > 0 else 'cw_arc',
+                                          self.snap_to_grid(cpx_to_tup(pm)), self.snap_to_grid(cpx_to_tup(p2)), cpx_to_tup(c2)))
             if pm is None:
-                gcurves.append(('line', self.snap_to_grid(p1), self.snap_to_grid(p2)))
+                self.add_gcurve(gcurves, ('line', self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(p2))))
 
     def generate_gcurves(self, path):
         gcurves = []
@@ -416,11 +465,11 @@ class GioLaser(inkex.Effect):
             elif code == 'L':
                 assert len(op[1]) == 2
                 new = tuple(op[1])
-                gcurves.append(('line', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(new))))
+                self.add_gcurve(gcurves, ('line', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(new))))
                 current = new
             elif code == 'Z':
                 assert len(op[1]) == 0
-                gcurves.append(('line', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(beginning))))
+                self.add_gcurve(gcurves, ('line', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(beginning))))
                 current = beginning
             elif code == 'C':
                 assert len(op[1]) == 6
@@ -433,22 +482,9 @@ class GioLaser(inkex.Effect):
             else:
                 inkex.errormsg("Code %s not supported (so far...)" % (code))
                 break
-        gcurves = [gcurve for gcurve in gcurves if self.gcurve_len(gcurve) > 0]
+        gcurves = [gcurve for gcurve in gcurves if gcurve_len(gcurve) > 0]
         #inkex.errormsg("gcurves:\n%s" % (pprint.pformat(gcurves)))
         return gcurves
-
-    def gcurve_len(self, gcurve):
-        code = gcurve[0]
-        if code == 'line':
-            return abs(complex(*gcurve[1]) - complex(*gcurve[2]))
-        elif code == 'cw_arc':
-            # FIXME: this code is wrong (doesn't consider the angle)
-            return math.pi * abs(complex(*gcurve[1]) - complex(*gcurve[3]))
-        elif code == 'ccw_arc':
-            # FIXME: this code is wrong (doesn't consider the angle)
-            return math.pi * abs(complex(*gcurve[1]) - complex(*gcurve[3]))
-        else:
-            raise Exception("Should not arrive here, code = %s" % (code))
 
     def invert_gcurve(self, gcurve):
         code = gcurve[0]
@@ -651,6 +687,7 @@ class GioLaser(inkex.Effect):
             params = dict([x.split('=', 1) for x in params_str.split(',')])
 
         self.board.write_comment("Layer %s" % (name))
+        self.board.write_comment("with parameters: %s" % (params))
 
         # Interpret some well-known parameters
         params['feed'] = float(params['feed']) if 'feed' in params else self.options.feed
@@ -671,7 +708,8 @@ class GioLaser(inkex.Effect):
         #self.board.write_comment(pprint.pformat(gcurves))
 
         # Decide best order to draw
-        if self.options.draw_order in ['inside_first', 'outside_first']:
+        draw_order = params['draw-order'] if 'draw-order' in params else self.options.draw_order
+        if draw_order in ['inside_first', 'outside_first']:
             gcurves = list(self.sorted_gcurves(gcurves))
             if self.options.draw_order == 'outside_first':
                 gcurves.reverse()
