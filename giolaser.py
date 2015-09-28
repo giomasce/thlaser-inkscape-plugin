@@ -437,14 +437,19 @@ class GioLaser(inkex.Effect):
 
         # Write curves
         for p1, c1, tg1, pm, c2, tg2, p2 in biarcs:
-            if c1 is not None:
-                self.add_gcurve(gcurves, ('ccw_arc' if cross(p1 - c1, tg1) > 0 else 'cw_arc',
-                                          self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(pm)), cpx_to_tup(c1)))
-            if c2 is not None:
-                self.add_gcurve(gcurves, ('ccw_arc' if cross(p2 - c2, tg2) > 0 else 'cw_arc',
-                                          self.snap_to_grid(cpx_to_tup(pm)), self.snap_to_grid(cpx_to_tup(p2)), cpx_to_tup(c2)))
             if pm is None:
                 self.add_gcurve(gcurves, ('line', self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(p2))))
+            else:
+                if c1 is not None:
+                    self.add_gcurve(gcurves, ('ccw_arc' if cross(p1 - c1, tg1) > 0 else 'cw_arc',
+                                              self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(pm)), cpx_to_tup(c1)))
+                else:
+                    self.add_gcurve(gcurves, ('line', self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(pm))))
+                if c2 is not None:
+                    self.add_gcurve(gcurves, ('ccw_arc' if cross(p2 - c2, tg2) > 0 else 'cw_arc',
+                                              self.snap_to_grid(cpx_to_tup(pm)), self.snap_to_grid(cpx_to_tup(p2)), cpx_to_tup(c2)))
+                else:
+                    self.add_gcurve(gcurves, ('line', self.snap_to_grid(cpx_to_tup(pm)), self.snap_to_grid(cpx_to_tup(p2))))
 
     def generate_gcurves(self, path):
         gcurves = []
