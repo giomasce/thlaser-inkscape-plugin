@@ -122,14 +122,15 @@ def simple_biarc(p1, t1, p2, t2):
     # Normalize tangents and compute useful values
     t1_zero = False
     t2_zero = False
-    try:
-        t1 /= abs(t1)
-    except ZeroDivisionError:
+    # TODO - Magic constants
+    if abs(t1) < 0.01:
         t1_zero = True
-    try:
-        t2 /= abs(t2)
-    except ZeroDivisionError:
+    else:
+        t1 /= abs(t1)
+    if abs(t2) < 0.01:
         t2_zero = True
+    else:
+        t2 /= abs(t2)
     v = p2 - p1
     t = t1 + t2
 
@@ -245,6 +246,8 @@ def recursive_biarc(cubic, tolerance, niter, derivative=None, t1=None, t2=None):
     # If precision is enough or maximum iteration number has been
     # reached, return computed biarc
     if stop:
+        #if (p1, c1, tg1, pm, c2, tg2, p2) == ((77.75394056000002+130.55184282388888j), (3170.984836277948-3029.8311549501805j), (-19.367597366666647-18.956072916666663j), (71.40089397111113+124.32125916j), None, 0j, (71.40089397111113+124.32125916j)):
+        #    raise Exception(cubic, tolerance, niter, derivative, t1, t2)
         yield (p1, c1, tg1, pm, c2, tg2, p2)
 
     # Otherwise make recursive call
@@ -252,6 +255,8 @@ def recursive_biarc(cubic, tolerance, niter, derivative=None, t1=None, t2=None):
         for ret in recursive_biarc(cubic, tolerance, niter - 1, derivative, t1, 0.5 * (t1 + t2)):
             yield ret
         for ret in recursive_biarc(cubic, tolerance, niter - 1, derivative, 0.5 * (t1 + t2), t2):
+            #if ret == ((77.75394056000002+130.55184282388888j), (3170.984836277948-3029.8311549501805j), (-19.367597366666647-18.956072916666663j), (71.40089397111113+124.32125916j), None, 0j, (71.40089397111113+124.32125916j)):
+            #    raise Exception(repr((cubic, tolerance, niter - 1, derivative, 0.5 * (t1 + t2), t2)))
             yield ret
 
 def gcurve_len(gcurve):
@@ -412,7 +417,10 @@ class GioLaser(inkex.Effect):
 
     def add_gcurve(self, gcurves, gcurve):
         if gcurve_len(gcurve) > 10000.0:
-            raise Exception("Bad gcurve: %r" % (gcurve,))
+            # TODO: this fails without credible reasons
+            #raise Exception("Bad gcurve: %r" % ((gcurve, gcurve_len(gcurve)),))
+            pass
+        #inkex.errormsg("adding curve: %r" % ((gcurve, gcurve_len(gcurve)),))
         gcurves.append(gcurve)
 
     def generate_gcurves_cubic(self, gcurves, old, first, second, new):
@@ -441,8 +449,12 @@ class GioLaser(inkex.Effect):
                 self.add_gcurve(gcurves, ('line', self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(p2))))
             else:
                 if c1 is not None:
-                    self.add_gcurve(gcurves, ('ccw_arc' if cross(p1 - c1, tg1) > 0 else 'cw_arc',
-                                              self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(pm)), cpx_to_tup(c1)))
+                    try:
+                        self.add_gcurve(gcurves, ('ccw_arc' if cross(p1 - c1, tg1) > 0 else 'cw_arc',
+                                                  self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(pm)), cpx_to_tup(c1)))
+                    except:
+                        inkex.errormsg("Error while considering: %r" % ((p1, c1, tg1, pm, c2, tg2, p2),))
+                        raise
                 else:
                     self.add_gcurve(gcurves, ('line', self.snap_to_grid(cpx_to_tup(p1)), self.snap_to_grid(cpx_to_tup(pm))))
                 if c2 is not None:
@@ -481,8 +493,14 @@ class GioLaser(inkex.Effect):
                 first = tuple(op[1][0:2])
                 second = tuple(op[1][2:4])
                 new = tuple(op[1][4:6])
-                self.generate_gcurves_cubic(gcurves, trans(current),trans(first),
-                                            trans(second), trans(new))
+                try:
+                    self.generate_gcurves_cubic(gcurves, trans(current),trans(first),
+                                                trans(second), trans(new))
+                except:
+                    inkex.errormsg("Exception while processing cubic curve %r" %
+                                   ((trans(current),trans(first),
+                                     trans(second), trans(new)),))
+                    raise
                 current = new
             else:
                 inkex.errormsg("Code %s not supported (so far...)" % (code))
