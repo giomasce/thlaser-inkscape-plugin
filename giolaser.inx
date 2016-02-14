@@ -47,6 +47,7 @@ For the latest revision please visit https://github.com/TurnkeyTyranny/laser-gco
       <param name="min-arc-radius" type="float" precision="5" min="-1000" max="5000"  _gui-text="Minimum arc radius">0.00005</param>
       <param name="xoffset" type="float" precision="4" min="-1000" max="1000" _gui-text="Offset along X axis">0.0</param>
       <param name="yoffset" type="float" precision="4" min="-1000" max="1000" _gui-text="Offset along Y axis">0.0</param>
+      <param name="curves-as-segments" type="boolean" _gui-text="Treat all curves as segments:">false</param>
     </page>
 
     <page name='tab' _gui-text='Preferences'>

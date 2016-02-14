@@ -337,6 +337,9 @@ class GioLaser(inkex.Effect):
         self.OptionParser.add_option("",   "--min-arc-radius",
                                      action="store", type="float", dest="min_arc_radius", default="0.0005",
                                      help="All arc having radius less than minimum will be considered as straight line")
+        self.OptionParser.add_option("",   "--curves-as-segments",
+                                     action="store", type="inkbool", dest="curves_as_segments", default=False,
+                                     help="Treat all curves as segments")
 
         # Tweaks
         self.OptionParser.add_option("",   "--unit",
@@ -463,7 +466,7 @@ class GioLaser(inkex.Effect):
                 else:
                     self.add_gcurve(gcurves, ('line', self.snap_to_grid(cpx_to_tup(pm)), self.snap_to_grid(cpx_to_tup(p2))))
 
-    def generate_gcurves(self, path):
+    def generate_gcurves(self, path, params):
         gcurves = []
         mat = path.transform
         def trans(p):
@@ -479,15 +482,15 @@ class GioLaser(inkex.Effect):
                 assert len(op[1]) == 2
                 current = tuple(op[1])
                 beginning = current
-            elif code == 'L':
-                assert len(op[1]) == 2
-                new = tuple(op[1])
-                self.add_gcurve(gcurves, ('line', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(new))))
-                current = new
             elif code == 'Z':
                 assert len(op[1]) == 0
                 self.add_gcurve(gcurves, ('line', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(beginning))))
                 current = beginning
+            elif code == 'L' or params['curves-as-segments']:
+                assert len(op[1]) == 2 or params['curves-as-segments']
+                new = tuple(op[1])
+                self.add_gcurve(gcurves, ('line', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(new))))
+                current = new
             elif code == 'C':
                 assert len(op[1]) == 6
                 first = tuple(op[1][0:2])
@@ -716,6 +719,7 @@ class GioLaser(inkex.Effect):
         params['feed'] = float(params['feed']) if 'feed' in params else self.options.feed
         params['move-feed'] = float(params['move-feed']) if 'move-feed' in params else self.options.move_feed
         params['laser'] = float(params['laser']) if 'laser' in params else self.options.laser
+        params['curves-as-segments'] = params['curves-as-segments'] == 'true' if 'curves-as-segments' in params else self.options.curves_as_segments
 
         # Setup a transform to account for measure units (mm or inch)
         trans = [[self.unit_scale * self.options.xscale, 0.0, self.options.xoffset],
@@ -727,7 +731,7 @@ class GioLaser(inkex.Effect):
             #self.board.write_comment('\nPath with id: %s\n\n' % (path.id))
             #self.board.write_comment(pprint.pformat(path.transform))
             #self.board.write_comment(pprint.pformat(path.data))
-            gcurves += self.generate_gcurves(path)
+            gcurves += self.generate_gcurves(path, params)
         #self.board.write_comment(pprint.pformat(gcurves))
 
         # Decide best order to draw
