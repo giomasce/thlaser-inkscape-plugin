@@ -268,13 +268,15 @@ def gcurve_len(gcurve):
         second = complex(*gcurve[2])
         center = complex(*gcurve[3])
         angle = cmath.phase((first - center) / (second - center))
-        if angle < 0.0:
-            angle += 2 * math.pi
-        assert 0.0 <= angle < 2 * math.pi
+        # Double modulo is to get sure that norm_angle is actually in
+        # [0.0, 2*math.pi). TODO: check numerical stability (when
+        # angle is small and could easily wrap around)
+        norm_angle = angle % (2 * math.pi) % (2 * math.pi)
+        assert 0.0 <= norm_angle < (2 * math.pi), (angle, norm_angle)
         if code == 'ccw_arc':
-            return angle * abs(first - center)
+            return norm_angle * abs(first - center)
         else:
-            return (2 * math.pi - angle) * abs(first - center)
+            return (2 * math.pi - norm_angle) * abs(first - center)
     else:
         raise Exception("Should not arrive here, code = %s" % (code))
 
@@ -491,11 +493,22 @@ class GioLaser(inkex.Effect):
                 new = tuple(op[1])
                 self.add_gcurve(gcurves, ('line', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(new))))
                 current = new
-            elif code == 'C':
-                assert len(op[1]) == 6
-                first = tuple(op[1][0:2])
-                second = tuple(op[1][2:4])
-                new = tuple(op[1][4:6])
+            elif code == 'C' or code == 'Q':
+                if code == 'C':
+                    assert len(op[1]) == 6
+                    first = tuple(op[1][0:2])
+                    second = tuple(op[1][2:4])
+                    new = tuple(op[1][4:6])
+                else:
+                    # See https://fontforge.github.io/bezier.html
+                    # ("Converting TrueType to PostScript")
+                    assert len(op[1]) == 4
+                    tmp = tuple(op[1][0:2])
+                    new = tuple(op[1][2:4])
+                    first = (current[0] + 2.0 / 3.0 * (tmp[0] - current[0]),
+                             current[1] + 2.0 / 3.0 + (tmp[1] - current[1]))
+                    second = (new[0] + 2.0 / 3.0 * (tmp[0] - new[0]),
+                              new[1] + 2.0 / 3.0 * (tmp[1] - new[1]))
                 try:
                     self.generate_gcurves_cubic(gcurves, trans(current),trans(first),
                                                 trans(second), trans(new))
