@@ -82,6 +82,10 @@ class GioRumba:
         self.foutput.write("G3 X%f Y%f I%f J%f F%f\n" % (x, y, i, j, f))
         # TODO: update time
 
+    def cubic(self, x, y, i, j, p, q, f):
+        self.foutput.write("G5 X%f Y%f I%f J%f P%f Q%f F%f\n" % (x, y, i, j, p, q, f))
+        # TODO: update time
+
     def write_comment(self, comment):
         self.foutput.write(''.join(['; ' + x + '\n' for x in comment.splitlines()]))
 
@@ -277,6 +281,9 @@ def gcurve_len(gcurve):
             return norm_angle * abs(first - center)
         else:
             return (2 * math.pi - norm_angle) * abs(first - center)
+    elif code == 'cubic':
+        # TODO: implement
+        return 10.0
     else:
         raise Exception("Should not arrive here, code = %s" % (code))
 
@@ -509,14 +516,15 @@ class GioLaser(inkex.Effect):
                              current[1] + 2.0 / 3.0 + (tmp[1] - current[1]))
                     second = (new[0] + 2.0 / 3.0 * (tmp[0] - new[0]),
                               new[1] + 2.0 / 3.0 * (tmp[1] - new[1]))
-                try:
-                    self.generate_gcurves_cubic(gcurves, trans(current),trans(first),
-                                                trans(second), trans(new))
-                except:
-                    inkex.errormsg("Exception while processing cubic curve %r" %
-                                   ((trans(current),trans(first),
-                                     trans(second), trans(new)),))
-                    raise
+                #try:
+                #    self.generate_gcurves_cubic(gcurves, trans(current),trans(first),
+                #                                trans(second), trans(new))
+                #except:
+                #    inkex.errormsg("Exception while processing cubic curve %r" %
+                #                   ((trans(current),trans(first),
+                #                     trans(second), trans(new)),))
+                #    raise
+                self.add_gcurve(gcurves, ('cubic', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(new)), trans(first), trans(second)))
                 current = new
             else:
                 inkex.errormsg("Code %s not supported (so far...)" % (code))
@@ -704,6 +712,11 @@ class GioLaser(inkex.Effect):
                 assert len(curve) == 4
                 center = curve[3]
                 self.board.ccw_arc(dest[0], dest[1], center[0] - orig[0], center[1] - orig[1], params['feed'])
+            elif code == 'cubic':
+                assert len(curve) == 5
+                first = curve[3]
+                second = curve[4]
+                self.board.cubic(dest[0], dest[1], first[0] - orig[0], first[1] - orig[1], second[0] - dest[0], second[1] - dest[1], params['feed'])
             else:
                 raise Exception("Should not arrive here")
             current = tuple(dest)
