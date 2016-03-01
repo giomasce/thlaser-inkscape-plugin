@@ -337,6 +337,9 @@ class GioLaser(inkex.Effect):
                                      help="Origin position (topleft or bottomleft).")
 
         # Tolerances and approximations
+        self.OptionParser.add_option("",   "--use-arcs",
+                                     action="store", type="inkbool", dest="use_arcs", default=False,
+                                     help="Use arc commands")
         self.OptionParser.add_option("",   "--biarc-tolerance",
                                      action="store", type="float", dest="biarc_tolerance", default="0.1",
                                      help="Tolerance used when calculating biarc interpolation.")
@@ -435,7 +438,7 @@ class GioLaser(inkex.Effect):
         #inkex.errormsg("adding curve: %r" % ((gcurve, gcurve_len(gcurve)),))
         gcurves.append(gcurve)
 
-    def generate_gcurves_cubic(self, gcurves, old, first, second, new):
+    def interp_cubic_gcurve(self, gcurves, old, first, second, new):
         """Compute the recursive biarc interpolation that describes a cubic curve.
 
         Points are assumed to have already been transformed according
@@ -516,15 +519,17 @@ class GioLaser(inkex.Effect):
                              current[1] + 2.0 / 3.0 + (tmp[1] - current[1]))
                     second = (new[0] + 2.0 / 3.0 * (tmp[0] - new[0]),
                               new[1] + 2.0 / 3.0 * (tmp[1] - new[1]))
-                #try:
-                #    self.generate_gcurves_cubic(gcurves, trans(current),trans(first),
-                #                                trans(second), trans(new))
-                #except:
-                #    inkex.errormsg("Exception while processing cubic curve %r" %
-                #                   ((trans(current),trans(first),
-                #                     trans(second), trans(new)),))
-                #    raise
-                self.add_gcurve(gcurves, ('cubic', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(new)), trans(first), trans(second)))
+                if self.options.use_arcs:
+                    try:
+                        self.interp_cubic_gcurve(gcurves, trans(current),trans(first),
+                                                 trans(second), trans(new))
+                    except:
+                        inkex.errormsg("Exception while processing cubic curve %r" %
+                                       ((trans(current),trans(first),
+                                         trans(second), trans(new)),))
+                        raise
+                else:
+                    self.add_gcurve(gcurves, ('cubic', self.snap_to_grid(trans(current)), self.snap_to_grid(trans(new)), trans(first), trans(second)))
                 current = new
             else:
                 inkex.errormsg("Code %s not supported (so far...)" % (code))

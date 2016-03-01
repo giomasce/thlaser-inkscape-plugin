@@ -41,6 +41,8 @@ For the latest revision please visit https://github.com/TurnkeyTyranny/laser-gco
       <param name="board" type="enum" _gui-text="Control board: ">
         <item value="gio_rumba">Gio's Rumba</item>
       </param>
+      <param name="use-arcs" type="boolean" _gui-text="Use arc commands">false</param>
+      <_param name="help" type="description">Use arc commands (G2/G3) instead of B-spline commands (G5). Unrecommended.</_param>
       <param name="biarc-tolerance" type='float' precision="4" _gui-text='Biarc interpolation tolerance'>0.001</param>
       <_param name="help" type="description">Biarc interpolation tolerance is the maximum allowed distance between a path and it's approximation. If this value is exceeded, the path will be split into two segments.</_param>
       <param name="biarc-max-split-depth" type="int" _gui-text="Maximum splitting depth">4</param>
